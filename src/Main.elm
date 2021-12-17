@@ -35,6 +35,7 @@ main =
 
 type alias Model =
     { dice : Array Dice
+    , players : List Player
     }
 
 
@@ -42,9 +43,15 @@ type alias Dice =
     { value : Int, held : Bool }
 
 
+type alias Player =
+    { name : String
+    , scores : Array Int
+    }
+
+
 init : () -> ( Model, Cmd Msg )
 init _ =
-    ( Model (Array.repeat 5 (Dice 1 False))
+    ( Model (Array.repeat 5 (Dice 1 False)) [ Player "Player 1" (Array.repeat 6 0) ]
     , Cmd.none
     )
 
@@ -68,12 +75,12 @@ update msg model =
             )
 
         NewDice newDice ->
-            ( Model (Array.fromList newDice)
+            ( { model | dice = Array.fromList newDice }
             , Cmd.none
             )
 
         ToggleHold diceIndex ->
-            ( Model (toggleHold model diceIndex)
+            ( { model | dice = toggleHold model diceIndex }
             , Cmd.none
             )
 
