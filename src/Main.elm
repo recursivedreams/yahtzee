@@ -1,30 +1,25 @@
--- Press a button to generate a random number between 1 and 6.
---
--- Read how it works:
---   https://guide.elm-lang.org/effects/random.html
---
+-- A simple yahtzee game
 
 
-module Main exposing (Model, Msg(..), getDieUrl, imageChooser, init, main, rollDice, subscriptions, update, view, viewDiceImg)
+module Main exposing (Model, Msg(..), init, main, rollDice, subscriptions, update, view)
 
 import Array exposing (Array)
 import Browser
-import Char
 import Html exposing (..)
-import Html.Attributes as HtmlA exposing (..)
+import Html.Attributes as HtmlA
 import Html.Events exposing (..)
-import List exposing (intersperse)
+import List
 import Random
-import Random.Array
 import Random.Extra
 import Svg exposing (Svg)
-import Svg.Attributes as SvgA exposing (..)
+import Svg.Attributes as SvgA
 
 
 
 -- MAIN
 
 
+main : Program () Model Msg
 main =
     Browser.element
         { init = init
@@ -136,90 +131,33 @@ subscriptions model =
 view : Model -> Html Msg
 view model =
     div []
-        (List.map viewDiceImg (Array.toList model.dice)
-            ++ [ h1 [] [ text (viewDiceAsText model.dice) ]
-               , div [] (viewDiceAsChar model.dice)
-               , div [] (viewDice model.dice)
-               , div []
-                    [ Svg.svg
-                        [ SvgA.viewBox "0 0 600 100"
-                        , SvgA.width "600"
-                        , SvgA.height "100"
-                        ]
-                        (dieOne 0 "black"
-                            ++ dieTwo 100 "green"
-                            ++ dieThree 200 "blue"
-                            ++ dieFour 300 "deeppink"
-                            ++ dieFive 400 "orange"
-                            ++ dieSix 500 "brown"
-                        )
-                    ]
-               , button [ onClick Roll ] [ text "Roll" ]
-               ]
-        )
+        [ div [] (viewDice model.dice)
+        , h1 [] [ text (viewDiceAsText model.dice) ]
+        , button [ onClick Roll ] [ text "Roll" ]
+        , div []
+            [ Svg.svg
+                [ SvgA.viewBox "0 0 600 100"
+                , SvgA.width "600"
+                , SvgA.height "100"
+                ]
+                (dieOne 0 "black"
+                    ++ dieTwo 100 "green"
+                    ++ dieThree 200 "blue"
+                    ++ dieFour 300 "deeppink"
+                    ++ dieFive 400 "orange"
+                    ++ dieSix 500 "brown"
+                )
+            ]
+        ]
 
 
 viewDiceAsText : Array Dice -> String
 viewDiceAsText dice =
-    Array.toList dice |> List.map (\aDie -> aDie.value) |> List.map String.fromInt |> intersperse ", " |> String.concat
-
-
-viewDiceAsChar : Array Dice -> List (Html Msg)
-viewDiceAsChar dice =
-    Array.toIndexedList dice |> List.map viewDiceCharSpan
-
-
-viewDiceCharSpan : ( Int, Dice ) -> Html Msg
-viewDiceCharSpan ( index, dice ) =
-    if dice.held then
-        span
-            [ onClick (ToggleHold index)
-            , HtmlA.style "font-size" "12em"
-            , HtmlA.style "color" "blue"
-            ]
-            [ text (String.fromChar (Char.fromCode (9855 + dice.value))) ]
-
-    else
-        span
-            [ onClick (ToggleHold index)
-            , HtmlA.style "font-size" "12em"
-            ]
-            [ text (String.fromChar (Char.fromCode (9855 + dice.value))) ]
-
-
-viewDiceImg : Dice -> Html Msg
-viewDiceImg dice =
-    img [ src (getDieUrl dice.value) ] []
-
-
-getDieUrl : Int -> String
-getDieUrl dieValue =
-    "https://upload.wikimedia.org/wikipedia/commons/" ++ imageChooser dieValue
-
-
-imageChooser : Int -> String
-imageChooser dieValue =
-    case dieValue of
-        1 ->
-            "2/2c/Alea_1.png"
-
-        2 ->
-            "b/b8/Alea_2.png"
-
-        3 ->
-            "2/2f/Alea_3.png"
-
-        4 ->
-            "8/8d/Alea_4.png"
-
-        5 ->
-            "5/55/Alea_5.png"
-
-        6 ->
-            "f/f4/Alea_6.png"
-
-        _ ->
-            "0/08/Achtung_troll.png"
+    Array.toList dice
+        |> List.map (\aDie -> aDie.value)
+        |> List.map String.fromInt
+        |> List.intersperse ", "
+        |> String.concat
 
 
 viewDice : Array Dice -> List (Html Msg)
@@ -269,6 +207,10 @@ pickDie die =
 
         _ ->
             [ dieBox 0 "red" ]
+
+
+
+-- SVG ASSETS
 
 
 dieOne : Int -> String -> List (Svg Msg)
