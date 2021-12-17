@@ -148,6 +148,41 @@ view model =
                     ++ dieSix 500 "brown"
                 )
             ]
+        , viewBoard
+        ]
+
+
+viewBoard : Html Msg
+viewBoard =
+    table []
+        [ tr []
+            [ th [] [ text "Players" ]
+            , th [] [ text "Player 1" ]
+            ]
+        , tr []
+            [ td [] [ text "Ones" ]
+            , td [] [ text "(score)" ]
+            ]
+        , tr []
+            [ td [] [ text "Twos" ]
+            , td [] [ text "(score)" ]
+            ]
+        , tr []
+            [ td [] [ text "Threes" ]
+            , td [] [ text "(score)" ]
+            ]
+        , tr []
+            [ td [] [ text "Fours" ]
+            , td [] [ text "(score)" ]
+            ]
+        , tr []
+            [ td [] [ text "Fives" ]
+            , td [] [ text "(score)" ]
+            ]
+        , tr []
+            [ td [] [ text "Sixes" ]
+            , td [] [ text "(score)" ]
+            ]
         ]
 
 
