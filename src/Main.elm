@@ -5,6 +5,7 @@ module Main exposing (Model, Msg(..), init, main, rollDice, subscriptions, updat
 
 import Array exposing (Array)
 import Browser
+import Dict exposing (Dict)
 import Html exposing (..)
 import Html.Attributes as HtmlA
 import Html.Events exposing (..)
@@ -45,13 +46,26 @@ type alias Dice =
 
 type alias Player =
     { name : String
-    , scores : Array Int
+    , scoreboard : Dict String (Maybe Int)
     }
+
+
+emptyScoreboard : Dict String (Maybe Int)
+emptyScoreboard =
+    Dict.fromList
+        [ ( "ones", Nothing )
+        , ( "twos", Nothing )
+        , ( "threes", Nothing )
+        , ( "fours", Nothing )
+        , ( "fives", Nothing )
+        , ( "sixes", Nothing )
+        , ( "sumUpper", Nothing )
+        ]
 
 
 init : () -> ( Model, Cmd Msg )
 init _ =
-    ( Model (Array.repeat 5 (Dice 1 False)) [ Player "Player 1" (Array.repeat 6 0) ]
+    ( Model (Array.repeat 5 (Dice 1 False)) [ Player "Player 1" emptyScoreboard ]
     , Cmd.none
     )
 
@@ -97,10 +111,6 @@ roll die =
 
     else
         Random.map (\value -> Dice value False) (Random.int 1 6)
-
-
-
--- Random.map (\value -> Dice value False) (Random.int 1 6)
 
 
 toggleHold : Model -> Int -> Array Dice
@@ -163,31 +173,38 @@ viewBoard : Html Msg
 viewBoard =
     table []
         [ tr []
-            [ th [] [ text "Players" ]
+            [ th [] []
+            , th [] [ text "Players" ]
             , th [] [ text "Player 1" ]
             ]
         , tr []
-            [ td [] [ text "Ones" ]
+            [ td [] [ button [] [ text "Score" ] ]
+            , td [] [ text "Ones" ]
             , td [] [ text "(score)" ]
             ]
         , tr []
-            [ td [] [ text "Twos" ]
+            [ td [] []
+            , td [] [ text "Twos" ]
             , td [] [ text "(score)" ]
             ]
         , tr []
-            [ td [] [ text "Threes" ]
+            [ td [] []
+            , td [] [ text "Threes" ]
             , td [] [ text "(score)" ]
             ]
         , tr []
-            [ td [] [ text "Fours" ]
+            [ td [] []
+            , td [] [ text "Fours" ]
             , td [] [ text "(score)" ]
             ]
         , tr []
-            [ td [] [ text "Fives" ]
+            [ td [] []
+            , td [] [ text "Fives" ]
             , td [] [ text "(score)" ]
             ]
         , tr []
-            [ td [] [ text "Sixes" ]
+            [ td [] []
+            , td [] [ text "Sixes" ]
             , td [] [ text "(score)" ]
             ]
         ]
@@ -329,4 +346,10 @@ dieBox x color =
 
 dieDot : Int -> Int -> String -> Svg Msg
 dieDot x y color =
-    Svg.circle [ SvgA.cx (String.fromInt x), SvgA.cy (String.fromInt y), SvgA.r "9", SvgA.fill color ] []
+    Svg.circle
+        [ SvgA.cx (String.fromInt x)
+        , SvgA.cy (String.fromInt y)
+        , SvgA.r "9"
+        , SvgA.fill color
+        ]
+        []
