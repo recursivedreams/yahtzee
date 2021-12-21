@@ -10,8 +10,10 @@ import Html exposing (..)
 import Html.Attributes as HtmlA
 import Html.Events exposing (..)
 import List
+import List.Extra as List
 import Random
 import Random.Extra
+import String exposing (fromInt)
 import Svg exposing (Svg)
 import Svg.Attributes as SvgA
 
@@ -46,26 +48,40 @@ type alias Dice =
 
 type alias Player =
     { name : String
-    , scoreboard : Dict String (Maybe Int)
+    , scoreboardUpper : ScoreboardUpper
     }
 
 
-emptyScoreboard : Dict String (Maybe Int)
-emptyScoreboard =
-    Dict.fromList
-        [ ( "ones", Nothing )
-        , ( "twos", Nothing )
-        , ( "threes", Nothing )
-        , ( "fours", Nothing )
-        , ( "fives", Nothing )
-        , ( "sixes", Nothing )
-        , ( "sumUpper", Nothing )
-        ]
+type alias ScoreboardUpper =
+    { ones : Maybe Int
+    , twos : Maybe Int
+    , threes : Maybe Int
+    , fours : Maybe Int
+    , fives : Maybe Int
+    , sixes : Maybe Int
+    , sum : Int
+    }
+
+
+emptyScoreboardUpper : ScoreboardUpper
+emptyScoreboardUpper =
+    { ones = Nothing
+    , twos = Nothing
+    , threes = Nothing
+    , fours = Nothing
+    , fives = Nothing
+    , sixes = Nothing
+    , sum = 0
+    }
 
 
 init : () -> ( Model, Cmd Msg )
 init _ =
-    ( Model (Array.repeat 5 (Dice 1 False)) [ Player "Player 1" emptyScoreboard ]
+    ( Model
+        (Array.repeat 5 (Dice 1 False))
+        [ Player "Player 1" emptyScoreboardUpper
+        , Player "Player 2" emptyScoreboardUpper
+        ]
     , Cmd.none
     )
 
@@ -126,7 +142,7 @@ canHasDice : Maybe Dice -> Dice
 canHasDice maybeDie =
     case maybeDie of
         Nothing ->
-            Dice 1 False
+            Dice 7 False
 
         Just die ->
             Dice die.value (not die.held)
@@ -165,49 +181,91 @@ view model =
                     ++ dieSix 500 "brown"
                 )
             ]
-        , viewBoard
+        , viewBoard model.players
         ]
 
 
-viewBoard : Html Msg
-viewBoard =
+viewBoard : List Player -> Html Msg
+viewBoard players =
+    let
+        scoresUpper =
+            List.map .scoreboardUpper players
+    in
     table []
         [ tr []
-            [ th [] []
-            , th [] [ text "Players" ]
-            , th [] [ text "Player 1" ]
-            ]
+            ([ th [] []
+             , th [] [ text "Players" ]
+             ]
+                ++ List.map viewPlayerName players
+            )
         , tr []
-            [ td [] [ button [] [ text "Score" ] ]
-            , td [] [ text "Ones" ]
-            , td [] [ text "(score)" ]
-            ]
+            ([ td [] [ button [] [ text "Score" ] ]
+             , th [] [ text "Ones" ]
+             ]
+                ++ List.map viewScore (List.map .ones scoresUpper)
+            )
         , tr []
-            [ td [] []
-            , td [] [ text "Twos" ]
-            , td [] [ text "(score)" ]
-            ]
+            ([ td [] [ button [] [ text "Score" ] ]
+             , th [] [ text "Twos" ]
+             ]
+                ++ List.map viewScore (List.map .twos scoresUpper)
+            )
         , tr []
-            [ td [] []
-            , td [] [ text "Threes" ]
-            , td [] [ text "(score)" ]
-            ]
+            ([ td [] [ button [] [ text "Score" ] ]
+             , th [] [ text "Threes" ]
+             ]
+                ++ List.map viewScore (List.map .threes scoresUpper)
+            )
         , tr []
-            [ td [] []
-            , td [] [ text "Fours" ]
-            , td [] [ text "(score)" ]
-            ]
+            ([ td [] [ button [] [ text "Score" ] ]
+             , th [] [ text "Fours" ]
+             ]
+                ++ List.map viewScore (List.map .fours scoresUpper)
+            )
         , tr []
-            [ td [] []
-            , td [] [ text "Fives" ]
-            , td [] [ text "(score)" ]
-            ]
+            ([ td [] [ button [] [ text "Score" ] ]
+             , th [] [ text "Fives" ]
+             ]
+                ++ List.map viewScore (List.map .fives scoresUpper)
+            )
         , tr []
-            [ td [] []
-            , td [] [ text "Sixes" ]
-            , td [] [ text "(score)" ]
-            ]
+            ([ td [] [ button [] [ text "Score" ] ]
+             , th [] [ text "Sixes" ]
+             ]
+                ++ List.map viewScore (List.map .sixes scoresUpper)
+            )
+        , tr []
+            ([ td [] []
+             , th [] [ text "Sum" ]
+             ]
+                ++ List.map viewSum (List.map .sum scoresUpper)
+            )
         ]
+
+
+viewSum : Int -> Html Msg
+viewSum sum =
+    td [] [ text (String.fromInt sum) ]
+
+
+viewScore : Maybe Int -> Html Msg
+viewScore maybeScore =
+    td [] [ text (viewScoreString maybeScore) ]
+
+
+viewScoreString : Maybe Int -> String
+viewScoreString maybeScore =
+    case maybeScore of
+        Nothing ->
+            "(no score)"
+
+        Just score ->
+            String.fromInt score
+
+
+viewPlayerName : Player -> Html Msg
+viewPlayerName player =
+    th [] [ text player.name ]
 
 
 viewDiceAsText : Array Dice -> String
