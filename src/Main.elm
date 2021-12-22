@@ -39,6 +39,7 @@ main =
 type alias Model =
     { dice : Array Dice
     , players : List Player
+    , activePlayer : Int
     }
 
 
@@ -48,12 +49,7 @@ type alias Dice =
 
 type alias Player =
     { name : String
-    , scoreboardUpper : ScoreboardUpper
-    }
-
-
-type alias ScoreboardUpper =
-    { ones : Maybe Int
+    , ones : Maybe Int
     , twos : Maybe Int
     , threes : Maybe Int
     , fours : Maybe Int
@@ -63,9 +59,10 @@ type alias ScoreboardUpper =
     }
 
 
-emptyScoreboardUpper : ScoreboardUpper
-emptyScoreboardUpper =
-    { ones = Nothing
+newPlayer : String -> Player
+newPlayer playerName =
+    { name = playerName
+    , ones = Nothing
     , twos = Nothing
     , threes = Nothing
     , fours = Nothing
@@ -75,13 +72,27 @@ emptyScoreboardUpper =
     }
 
 
+testPlayer : String -> Int -> Int -> Player
+testPlayer playerName oneTest sumTest =
+    { name = playerName
+    , ones = Just oneTest
+    , twos = Nothing
+    , threes = Nothing
+    , fours = Nothing
+    , fives = Nothing
+    , sixes = Nothing
+    , sum = sumTest
+    }
+
+
 init : () -> ( Model, Cmd Msg )
 init _ =
     ( Model
         (Array.repeat 5 (Dice 1 False))
-        [ Player "Player 1" emptyScoreboardUpper
-        , Player "Player 2" emptyScoreboardUpper
+        [ newPlayer "Player 1"
+        , newPlayer "Player 2"
         ]
+        0
     , Cmd.none
     )
 
@@ -163,8 +174,14 @@ subscriptions model =
 
 view : Model -> Html Msg
 view model =
+    let
+        activePlayer =
+            Maybe.withDefault (newPlayer "unknown")
+                (List.getAt model.activePlayer model.players)
+    in
     div []
-        [ div [] (viewDice model.dice)
+        [ h1 [] [ text (activePlayer.name ++ "'s turn") ]
+        , div [] (viewDice model.dice)
         , h1 [] [ text (viewDiceAsText model.dice) ]
         , button [ onClick Roll ] [ text "Roll" ]
         , div []
@@ -187,10 +204,6 @@ view model =
 
 viewBoard : List Player -> Html Msg
 viewBoard players =
-    let
-        scoresUpper =
-            List.map .scoreboardUpper players
-    in
     table []
         [ tr []
             ([ th [] []
@@ -202,43 +215,43 @@ viewBoard players =
             ([ td [] [ button [] [ text "Score" ] ]
              , th [] [ text "Ones" ]
              ]
-                ++ List.map viewScore (List.map .ones scoresUpper)
+                ++ List.map viewScore (List.map .ones players)
             )
         , tr []
             ([ td [] [ button [] [ text "Score" ] ]
              , th [] [ text "Twos" ]
              ]
-                ++ List.map viewScore (List.map .twos scoresUpper)
+                ++ List.map viewScore (List.map .twos players)
             )
         , tr []
             ([ td [] [ button [] [ text "Score" ] ]
              , th [] [ text "Threes" ]
              ]
-                ++ List.map viewScore (List.map .threes scoresUpper)
+                ++ List.map viewScore (List.map .threes players)
             )
         , tr []
             ([ td [] [ button [] [ text "Score" ] ]
              , th [] [ text "Fours" ]
              ]
-                ++ List.map viewScore (List.map .fours scoresUpper)
+                ++ List.map viewScore (List.map .fours players)
             )
         , tr []
             ([ td [] [ button [] [ text "Score" ] ]
              , th [] [ text "Fives" ]
              ]
-                ++ List.map viewScore (List.map .fives scoresUpper)
+                ++ List.map viewScore (List.map .fives players)
             )
         , tr []
             ([ td [] [ button [] [ text "Score" ] ]
              , th [] [ text "Sixes" ]
              ]
-                ++ List.map viewScore (List.map .sixes scoresUpper)
+                ++ List.map viewScore (List.map .sixes players)
             )
         , tr []
             ([ td [] []
              , th [] [ text "Sum" ]
              ]
-                ++ List.map viewSum (List.map .sum scoresUpper)
+                ++ List.map viewSum (List.map .sum players)
             )
         ]
 
