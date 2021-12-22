@@ -105,6 +105,8 @@ type Msg
     = Roll
     | NewDice (List Dice)
     | ToggleHold Int
+    | SelectAll
+    | UnselectAll
     | Score Category
 
 
@@ -132,6 +134,16 @@ update msg model =
 
         ToggleHold diceIndex ->
             ( { model | dice = toggleHold model diceIndex }
+            , Cmd.none
+            )
+
+        SelectAll ->
+            ( { model | dice = Array.map (\die -> { die | held = True }) model.dice }
+            , Cmd.none
+            )
+
+        UnselectAll ->
+            ( { model | dice = Array.map (\die -> { die | held = False }) model.dice }
             , Cmd.none
             )
 
@@ -279,6 +291,8 @@ view model =
         , div [] (viewDice model.dice)
         , h1 [] [ text (viewDiceAsText model.dice) ]
         , button [ onClick Roll ] [ text "Roll" ]
+        , button [ onClick SelectAll ] [ text "Hold all" ]
+        , button [ onClick UnselectAll ] [ text "Hold none" ]
         , div []
             [ Svg.svg
                 [ SvgA.viewBox "0 0 600 100"
