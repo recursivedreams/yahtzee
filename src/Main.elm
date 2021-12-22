@@ -1,7 +1,7 @@
 -- A simple yahtzee game
 
 
-module Main exposing (Model, Msg(..), init, main, rollDice, subscriptions, update, view)
+module Main exposing (..)
 
 import Array exposing (Array, length)
 import Browser
@@ -40,6 +40,8 @@ type alias Model =
     { dice : Array Dice
     , players : List Player
     , activePlayer : Int
+    , rollsLeft : Int
+    , newRound : Bool
     }
 
 
@@ -93,6 +95,8 @@ init _ =
         , newPlayer "Player 2"
         ]
         0
+        3
+        True
     , Cmd.none
     )
 
@@ -132,7 +136,11 @@ update msg model =
             )
 
         NewDice newDice ->
-            ( { model | dice = Array.fromList newDice }
+            ( { model
+                | dice = Array.fromList newDice
+                , rollsLeft = model.rollsLeft - 1
+                , newRound = False
+              }
             , Cmd.none
             )
 
@@ -155,6 +163,8 @@ update msg model =
             ( { model
                 | players = scorePlayer model category
                 , activePlayer = nextPlayer model.activePlayer (List.length model.players)
+                , rollsLeft = 3
+                , newRound = True
               }
             , Cmd.none
             )
@@ -291,10 +301,10 @@ view model =
                 (List.getAt model.activePlayer model.players)
     in
     div []
-        [ h1 [] [ text (activePlayer.name ++ "'s turn") ]
+        [ h1 [] [ text (activePlayer.name ++ "'s turn. Rolls left: " ++ String.fromInt model.rollsLeft) ]
         , div [] (viewDice model.dice)
         , h1 [] [ text (viewDiceAsText model.dice) ]
-        , button [ onClick Roll ] [ text "Roll" ]
+        , button [ onClick (clickRoll model) ] [ text "Roll" ]
         , button [ onClick SelectAll ] [ text "Hold all" ]
         , button [ onClick UnselectAll ] [ text "Hold none" ]
         , div []
@@ -311,72 +321,80 @@ view model =
                     ++ dieSix 500 "brown"
                 )
             ]
-        , viewBoard activePlayer model.players
+        , viewBoard model activePlayer
         ]
 
 
-viewBoard : Player -> List Player -> Html Msg
-viewBoard activePlayer players =
+clickRoll : Model -> Msg
+clickRoll model =
+    if model.rollsLeft <= 0 then
+        NoOp
+
+    else
+        Roll
+
+
+viewBoard : Model -> Player -> Html Msg
+viewBoard model activePlayer =
     table []
         [ tr []
             ([ th [] []
              , th [] [ text "Players" ]
              ]
-                ++ List.map viewPlayerName players
+                ++ List.map viewPlayerName model.players
             )
         , tr []
-            ([ td [] [ button [ onClick (clickScoreButton activePlayer.ones Ones) ] [ text "Score" ] ]
+            ([ td [] [ button [ onClick (clickScoreButton model activePlayer.ones Ones) ] [ text "Score" ] ]
              , th [] [ text "Ones" ]
              ]
-                ++ List.map viewScore (List.map .ones players)
+                ++ List.map viewScore (List.map .ones model.players)
             )
         , tr []
-            ([ td [] [ button [ onClick (clickScoreButton activePlayer.twos Twos) ] [ text "Score" ] ]
+            ([ td [] [ button [ onClick (clickScoreButton model activePlayer.twos Twos) ] [ text "Score" ] ]
              , th [] [ text "Twos" ]
              ]
-                ++ List.map viewScore (List.map .twos players)
+                ++ List.map viewScore (List.map .twos model.players)
             )
         , tr []
-            ([ td [] [ button [ onClick (clickScoreButton activePlayer.threes Threes) ] [ text "Score" ] ]
+            ([ td [] [ button [ onClick (clickScoreButton model activePlayer.threes Threes) ] [ text "Score" ] ]
              , th [] [ text "Threes" ]
              ]
-                ++ List.map viewScore (List.map .threes players)
+                ++ List.map viewScore (List.map .threes model.players)
             )
         , tr []
-            ([ td [] [ button [ onClick (clickScoreButton activePlayer.fours Fours) ] [ text "Score" ] ]
+            ([ td [] [ button [ onClick (clickScoreButton model activePlayer.fours Fours) ] [ text "Score" ] ]
              , th [] [ text "Fours" ]
              ]
-                ++ List.map viewScore (List.map .fours players)
+                ++ List.map viewScore (List.map .fours model.players)
             )
         , tr []
-            ([ td [] [ button [ onClick (clickScoreButton activePlayer.fives Fives) ] [ text "Score" ] ]
+            ([ td [] [ button [ onClick (clickScoreButton model activePlayer.fives Fives) ] [ text "Score" ] ]
              , th [] [ text "Fives" ]
              ]
-                ++ List.map viewScore (List.map .fives players)
+                ++ List.map viewScore (List.map .fives model.players)
             )
         , tr []
-            ([ td [] [ button [ onClick (clickScoreButton activePlayer.sixes Sixes) ] [ text "Score" ] ]
+            ([ td [] [ button [ onClick (clickScoreButton model activePlayer.sixes Sixes) ] [ text "Score" ] ]
              , th [] [ text "Sixes" ]
              ]
-                ++ List.map viewScore (List.map .sixes players)
+                ++ List.map viewScore (List.map .sixes model.players)
             )
         , tr []
             ([ td [] []
              , th [] [ text "Sum" ]
              ]
-                ++ List.map viewSum (List.map .sum players)
+                ++ List.map viewSum (List.map .sum model.players)
             )
         ]
 
 
-clickScoreButton : Maybe Int -> Category -> Msg
-clickScoreButton maybeScore category =
-    case maybeScore of
-        Nothing ->
-            Score category
+clickScoreButton : Model -> Maybe Int -> Category -> Msg
+clickScoreButton model maybeScore category =
+    if maybeScore /= Nothing || model.newRound then
+        NoOp
 
-        Just score ->
-            NoOp
+    else
+        Score category
 
 
 viewSum : Int -> Html Msg
@@ -459,11 +477,16 @@ pickDie die =
             dieSix 0 color
 
         _ ->
-            [ dieBox 0 "red" ]
+            dieBlanc 0 "red"
 
 
 
 -- SVG ASSETS
+
+
+dieBlanc : Int -> String -> List (Svg Msg)
+dieBlanc xpos color =
+    [ dieBox (xpos + 5) color ]
 
 
 dieOne : Int -> String -> List (Svg Msg)
