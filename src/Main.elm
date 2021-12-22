@@ -3,7 +3,7 @@
 
 module Main exposing (Model, Msg(..), init, main, rollDice, subscriptions, update, view)
 
-import Array exposing (Array)
+import Array exposing (Array, length)
 import Browser
 import Dict exposing (Dict)
 import Html exposing (..)
@@ -105,6 +105,16 @@ type Msg
     = Roll
     | NewDice (List Dice)
     | ToggleHold Int
+    | Score Category
+
+
+type Category
+    = Ones
+    | Twos
+    | Threes
+    | Fours
+    | Fives
+    | Sixes
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -124,6 +134,91 @@ update msg model =
             ( { model | dice = toggleHold model diceIndex }
             , Cmd.none
             )
+
+        Score category ->
+            ( { model
+                | players = scorePlayer model category
+                , activePlayer = nextPlayer model.activePlayer (List.length model.players)
+              }
+            , Cmd.none
+            )
+
+
+nextPlayer : Int -> Int -> Int
+nextPlayer playerIndex numPlayers =
+    if playerIndex + 1 >= numPlayers then
+        0
+
+    else
+        playerIndex + 1
+
+
+scorePlayer : Model -> Category -> List Player
+scorePlayer model category =
+    let
+        player =
+            canHasPlayer (List.getAt model.activePlayer model.players)
+    in
+    case category of
+        Ones ->
+            let
+                score =
+                    scoreNumber model.dice 1
+            in
+            List.setAt model.activePlayer { player | ones = Just score, sum = player.sum + score } model.players
+
+        Twos ->
+            let
+                score =
+                    scoreNumber model.dice 2
+            in
+            List.setAt model.activePlayer { player | twos = Just score, sum = player.sum + score } model.players
+
+        Threes ->
+            let
+                score =
+                    scoreNumber model.dice 3
+            in
+            List.setAt model.activePlayer { player | threes = Just score, sum = player.sum + score } model.players
+
+        Fours ->
+            let
+                score =
+                    scoreNumber model.dice 4
+            in
+            List.setAt model.activePlayer { player | fours = Just score, sum = player.sum + score } model.players
+
+        Fives ->
+            let
+                score =
+                    scoreNumber model.dice 5
+            in
+            List.setAt model.activePlayer { player | fives = Just score, sum = player.sum + score } model.players
+
+        Sixes ->
+            let
+                score =
+                    scoreNumber model.dice 6
+            in
+            List.setAt model.activePlayer { player | sixes = Just score, sum = player.sum + score } model.players
+
+
+scoreNumber : Array Dice -> Int -> Int
+scoreNumber dice number =
+    Array.toList dice
+        |> List.map .value
+        |> List.filter (\value -> value == number)
+        |> List.sum
+
+
+canHasPlayer : Maybe Player -> Player
+canHasPlayer maybePlayer =
+    case maybePlayer of
+        Nothing ->
+            newPlayer "unknown"
+
+        Just player ->
+            player
 
 
 rollDice : Array Dice -> Random.Generator (List Dice)
@@ -212,37 +307,37 @@ viewBoard players =
                 ++ List.map viewPlayerName players
             )
         , tr []
-            ([ td [] [ button [] [ text "Score" ] ]
+            ([ td [] [ button [ onClick (Score Ones) ] [ text "Score" ] ]
              , th [] [ text "Ones" ]
              ]
                 ++ List.map viewScore (List.map .ones players)
             )
         , tr []
-            ([ td [] [ button [] [ text "Score" ] ]
+            ([ td [] [ button [ onClick (Score Twos) ] [ text "Score" ] ]
              , th [] [ text "Twos" ]
              ]
                 ++ List.map viewScore (List.map .twos players)
             )
         , tr []
-            ([ td [] [ button [] [ text "Score" ] ]
+            ([ td [] [ button [ onClick (Score Threes) ] [ text "Score" ] ]
              , th [] [ text "Threes" ]
              ]
                 ++ List.map viewScore (List.map .threes players)
             )
         , tr []
-            ([ td [] [ button [] [ text "Score" ] ]
+            ([ td [] [ button [ onClick (Score Fours) ] [ text "Score" ] ]
              , th [] [ text "Fours" ]
              ]
                 ++ List.map viewScore (List.map .fours players)
             )
         , tr []
-            ([ td [] [ button [] [ text "Score" ] ]
+            ([ td [] [ button [ onClick (Score Fives) ] [ text "Score" ] ]
              , th [] [ text "Fives" ]
              ]
                 ++ List.map viewScore (List.map .fives players)
             )
         , tr []
-            ([ td [] [ button [] [ text "Score" ] ]
+            ([ td [] [ button [ onClick (Score Sixes) ] [ text "Score" ] ]
              , th [] [ text "Sixes" ]
              ]
                 ++ List.map viewScore (List.map .sixes players)
