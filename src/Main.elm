@@ -102,7 +102,8 @@ init _ =
 
 
 type Msg
-    = Roll
+    = NoOp
+    | Roll
     | NewDice (List Dice)
     | ToggleHold Int
     | SelectAll
@@ -122,6 +123,9 @@ type Category
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
+        NoOp ->
+            ( model, Cmd.none )
+
         Roll ->
             ( model
             , Random.generate NewDice (rollDice model.dice)
@@ -307,12 +311,12 @@ view model =
                     ++ dieSix 500 "brown"
                 )
             ]
-        , viewBoard model.players
+        , viewBoard activePlayer model.players
         ]
 
 
-viewBoard : List Player -> Html Msg
-viewBoard players =
+viewBoard : Player -> List Player -> Html Msg
+viewBoard activePlayer players =
     table []
         [ tr []
             ([ th [] []
@@ -321,37 +325,37 @@ viewBoard players =
                 ++ List.map viewPlayerName players
             )
         , tr []
-            ([ td [] [ button [ onClick (Score Ones) ] [ text "Score" ] ]
+            ([ td [] [ button [ onClick (clickScoreButton activePlayer.ones Ones) ] [ text "Score" ] ]
              , th [] [ text "Ones" ]
              ]
                 ++ List.map viewScore (List.map .ones players)
             )
         , tr []
-            ([ td [] [ button [ onClick (Score Twos) ] [ text "Score" ] ]
+            ([ td [] [ button [ onClick (clickScoreButton activePlayer.twos Twos) ] [ text "Score" ] ]
              , th [] [ text "Twos" ]
              ]
                 ++ List.map viewScore (List.map .twos players)
             )
         , tr []
-            ([ td [] [ button [ onClick (Score Threes) ] [ text "Score" ] ]
+            ([ td [] [ button [ onClick (clickScoreButton activePlayer.threes Threes) ] [ text "Score" ] ]
              , th [] [ text "Threes" ]
              ]
                 ++ List.map viewScore (List.map .threes players)
             )
         , tr []
-            ([ td [] [ button [ onClick (Score Fours) ] [ text "Score" ] ]
+            ([ td [] [ button [ onClick (clickScoreButton activePlayer.fours Fours) ] [ text "Score" ] ]
              , th [] [ text "Fours" ]
              ]
                 ++ List.map viewScore (List.map .fours players)
             )
         , tr []
-            ([ td [] [ button [ onClick (Score Fives) ] [ text "Score" ] ]
+            ([ td [] [ button [ onClick (clickScoreButton activePlayer.fives Fives) ] [ text "Score" ] ]
              , th [] [ text "Fives" ]
              ]
                 ++ List.map viewScore (List.map .fives players)
             )
         , tr []
-            ([ td [] [ button [ onClick (Score Sixes) ] [ text "Score" ] ]
+            ([ td [] [ button [ onClick (clickScoreButton activePlayer.sixes Sixes) ] [ text "Score" ] ]
              , th [] [ text "Sixes" ]
              ]
                 ++ List.map viewScore (List.map .sixes players)
@@ -363,6 +367,16 @@ viewBoard players =
                 ++ List.map viewSum (List.map .sum players)
             )
         ]
+
+
+clickScoreButton : Maybe Int -> Category -> Msg
+clickScoreButton maybeScore category =
+    case maybeScore of
+        Nothing ->
+            Score category
+
+        Just score ->
+            NoOp
 
 
 viewSum : Int -> Html Msg
