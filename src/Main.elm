@@ -302,10 +302,10 @@ view model =
     in
     div []
         [ h1 [] [ text (activePlayer.name ++ "'s turn. Rolls left: " ++ String.fromInt model.rollsLeft) ]
-        , div [] (viewDice model.dice)
+        , div [] (viewDice model)
         , h1 [] [ text (viewDiceAsText model.dice) ]
         , button [ onClick (clickRoll model) ] [ text "Roll" ]
-        , button [ onClick SelectAll ] [ text "Hold all" ]
+        , button [ onClick (clickSelectAll model) ] [ text "Hold all" ]
         , button [ onClick UnselectAll ] [ text "Hold none" ]
         , div []
             [ Svg.svg
@@ -332,6 +332,15 @@ clickRoll model =
 
     else
         Roll
+
+
+clickSelectAll : Model -> Msg
+clickSelectAll model =
+    if model.newRound then
+        NoOp
+
+    else
+        SelectAll
 
 
 viewBoard : Model -> Player -> Html Msg
@@ -431,20 +440,29 @@ viewDiceAsText dice =
         |> String.concat
 
 
-viewDice : Array Dice -> List (Html Msg)
-viewDice dice =
-    Array.toIndexedList dice |> List.map viewDiceSpan
+viewDice : Model -> List (Html Msg)
+viewDice model =
+    Array.toIndexedList model.dice |> List.map (viewDiceSpan model)
 
 
-viewDiceSpan : ( Int, Dice ) -> Html Msg
-viewDiceSpan ( dieIndex, die ) =
+viewDiceSpan : Model -> ( Int, Dice ) -> Html Msg
+viewDiceSpan model ( dieIndex, die ) =
     Svg.svg
-        [ onClick (ToggleHold dieIndex)
+        [ onClick (clickToggleHold dieIndex model.newRound)
         , SvgA.viewBox "0 0 100 100"
         , SvgA.width "100"
         , SvgA.height "100"
         ]
         (pickDie die)
+
+
+clickToggleHold : Int -> Bool -> Msg
+clickToggleHold dieIndex newRound =
+    if newRound then
+        NoOp
+
+    else
+        ToggleHold dieIndex
 
 
 pickDie : Dice -> List (Svg Msg)
