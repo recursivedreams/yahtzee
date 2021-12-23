@@ -32,6 +32,20 @@ main =
         }
 
 
+init : () -> ( Model, Cmd Msg )
+init _ =
+    ( Model
+        (Array.repeat 5 (Die Blank False))
+        [ newPlayer "Player 1"
+        , newPlayer "Player 2"
+        ]
+        0
+        3
+        True
+    , Cmd.none
+    )
+
+
 
 -- MODEL
 
@@ -57,6 +71,15 @@ type DieFace
     | Five
     | Six
     | Blank
+
+
+type Category
+    = Ones
+    | Twos
+    | Threes
+    | Fours
+    | Fives
+    | Sixes
 
 
 type alias Player =
@@ -97,20 +120,6 @@ testPlayer playerName oneTest sumTest =
     }
 
 
-init : () -> ( Model, Cmd Msg )
-init _ =
-    ( Model
-        (Array.repeat 5 (Die Blank False))
-        [ newPlayer "Player 1"
-        , newPlayer "Player 2"
-        ]
-        0
-        3
-        True
-    , Cmd.none
-    )
-
-
 
 -- UPDATE
 
@@ -123,15 +132,6 @@ type Msg
     | SelectAll
     | UnselectAll
     | Score Category
-
-
-type Category
-    = Ones
-    | Twos
-    | Threes
-    | Fours
-    | Fives
-    | Sixes
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -171,7 +171,8 @@ update msg model =
 
         Score category ->
             ( { model
-                | players = scorePlayer model category
+                | dice = Array.repeat 5 (Die Blank False)
+                , players = scorePlayer model category
                 , activePlayer = nextPlayer model.activePlayer (List.length model.players)
                 , rollsLeft = 3
                 , newRound = True
@@ -337,27 +338,41 @@ view model =
                 (List.getAt model.activePlayer model.players)
     in
     div []
-        [ h1 [] [ text (activePlayer.name ++ "'s turn. Rolls left: " ++ String.fromInt model.rollsLeft) ]
+        [ div []
+            [ Svg.svg
+                [ SvgA.viewBox "0 0 600 100"
+                , SvgA.width "600"
+                , SvgA.height "100"
+                ]
+                (dieOne 0 "purple"
+                    ++ dieTwo 100 "green"
+                    ++ dieThree 200 "blue"
+                    ++ dieFour 300 "deeppink"
+                    ++ dieFive 400 "orange"
+                    ++ dieSix 500 "red"
+                )
+            ]
+        , h1 [] [ text (activePlayer.name ++ "'s turn. Rolls left: " ++ String.fromInt model.rollsLeft) ]
         , div [] (viewDice model)
         , h1 [] [ text (viewDiceAsText model.dice) ]
         , button [ onClick (clickRoll model) ] [ text "Roll" ]
         , button [ onClick (clickSelectAll model) ] [ text "Hold all" ]
         , button [ onClick UnselectAll ] [ text "Hold none" ]
+        , viewBoard model activePlayer
         , div []
             [ Svg.svg
                 [ SvgA.viewBox "0 0 600 100"
                 , SvgA.width "600"
                 , SvgA.height "100"
                 ]
-                (dieOne 0 "black"
+                (dieOne 0 "purple"
                     ++ dieTwo 100 "green"
                     ++ dieThree 200 "blue"
                     ++ dieFour 300 "deeppink"
                     ++ dieFive 400 "orange"
-                    ++ dieSix 500 "brown"
+                    ++ dieSix 500 "red"
                 )
             ]
-        , viewBoard model activePlayer
         ]
 
 
