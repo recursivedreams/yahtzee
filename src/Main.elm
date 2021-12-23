@@ -3,9 +3,7 @@
 
 module Main exposing (..)
 
-import Array exposing (Array, length)
 import Browser
-import Dict exposing (Dict)
 import Html exposing (..)
 import Html.Attributes as HtmlA
 import Html.Events exposing (..)
@@ -13,7 +11,7 @@ import List
 import List.Extra as List
 import Random
 import Random.Extra
-import String exposing (fromInt)
+import String
 import Svg exposing (Svg)
 import Svg.Attributes as SvgA
 
@@ -34,29 +32,48 @@ main =
 
 init : () -> ( Model, Cmd Msg )
 init _ =
-    ( Model
-        (List.repeat 5 (Die Blank False))
-        [ newPlayer "Player 1"
-        , newPlayer "Player 2"
-        ]
-        0
-        3
-        True
+    ( newGame
     , Cmd.none
     )
 
 
 
 -- MODEL
+-- type alias Model =
+--     { dice : List Die
+--     , players : List Player
+--     , activePlayer : Int
+--     , rollsLeft : Int
+--     , newRound : Bool
+--     }
 
 
-type alias Model =
+type Model
+    = Menu
+    | Game GameState
+
+
+type alias GameState =
     { dice : List Die
     , players : List Player
     , activePlayer : Int
     , rollsLeft : Int
     , newRound : Bool
     }
+
+
+newGame : Model
+newGame =
+    Game
+        { dice = List.repeat 5 (Die Blank False)
+        , players =
+            [ newPlayer "Player 1"
+            , newPlayer "Player 2"
+            ]
+        , activePlayer = 0
+        , rollsLeft = 3
+        , newRound = True
+        }
 
 
 type alias Die =
@@ -136,49 +153,56 @@ type Msg
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
-    case msg of
-        NoOp ->
+    case model of
+        Menu ->
             ( model, Cmd.none )
 
-        Roll ->
-            ( model
-            , Random.generate NewDice (rollDice model.dice)
-            )
+        Game game ->
+            case msg of
+                NoOp ->
+                    ( model, Cmd.none )
 
-        NewDice newDice ->
-            ( { model
-                | dice = newDice
-                , rollsLeft = model.rollsLeft - 1
-                , newRound = False
-              }
-            , Cmd.none
-            )
+                Roll ->
+                    ( model
+                    , Random.generate NewDice (rollDice game.dice)
+                    )
 
-        ToggleHold diceIndex ->
-            ( { model | dice = toggleHold model diceIndex }
-            , Cmd.none
-            )
+                NewDice newDice ->
+                    ( Game
+                        { game
+                            | dice = newDice
+                            , rollsLeft = game.rollsLeft - 1
+                            , newRound = False
+                        }
+                    , Cmd.none
+                    )
 
-        SelectAll ->
-            ( { model | dice = List.map (\die -> { die | held = True }) model.dice }
-            , Cmd.none
-            )
+                ToggleHold diceIndex ->
+                    ( Game { game | dice = toggleHold game diceIndex }
+                    , Cmd.none
+                    )
 
-        UnselectAll ->
-            ( { model | dice = List.map (\die -> { die | held = False }) model.dice }
-            , Cmd.none
-            )
+                SelectAll ->
+                    ( Game { game | dice = List.map (\die -> { die | held = True }) game.dice }
+                    , Cmd.none
+                    )
 
-        Score category ->
-            ( { model
-                | dice = List.repeat 5 (Die Blank False)
-                , players = scorePlayer model category
-                , activePlayer = nextPlayer model.activePlayer (List.length model.players)
-                , rollsLeft = 3
-                , newRound = True
-              }
-            , Cmd.none
-            )
+                UnselectAll ->
+                    ( Game { game | dice = List.map (\die -> { die | held = False }) game.dice }
+                    , Cmd.none
+                    )
+
+                Score category ->
+                    ( Game
+                        { game
+                            | dice = List.repeat 5 (Die Blank False)
+                            , players = scorePlayer game category
+                            , activePlayer = nextPlayer game.activePlayer (List.length game.players)
+                            , rollsLeft = 3
+                            , newRound = True
+                        }
+                    , Cmd.none
+                    )
 
 
 nextPlayer : Int -> Int -> Int
@@ -190,54 +214,54 @@ nextPlayer playerIndex numPlayers =
         playerIndex + 1
 
 
-scorePlayer : Model -> Category -> List Player
-scorePlayer model category =
+scorePlayer : GameState -> Category -> List Player
+scorePlayer game category =
     let
         player =
-            canHasPlayer (List.getAt model.activePlayer model.players)
+            canHasPlayer (List.getAt game.activePlayer game.players)
     in
     case category of
         Ones ->
             let
                 score =
-                    scoreNumber model.dice One
+                    scoreNumber game.dice One
             in
-            List.setAt model.activePlayer { player | ones = Just score, sum = player.sum + score } model.players
+            List.setAt game.activePlayer { player | ones = Just score, sum = player.sum + score } game.players
 
         Twos ->
             let
                 score =
-                    scoreNumber model.dice Two
+                    scoreNumber game.dice Two
             in
-            List.setAt model.activePlayer { player | twos = Just score, sum = player.sum + score } model.players
+            List.setAt game.activePlayer { player | twos = Just score, sum = player.sum + score } game.players
 
         Threes ->
             let
                 score =
-                    scoreNumber model.dice Three
+                    scoreNumber game.dice Three
             in
-            List.setAt model.activePlayer { player | threes = Just score, sum = player.sum + score } model.players
+            List.setAt game.activePlayer { player | threes = Just score, sum = player.sum + score } game.players
 
         Fours ->
             let
                 score =
-                    scoreNumber model.dice Four
+                    scoreNumber game.dice Four
             in
-            List.setAt model.activePlayer { player | fours = Just score, sum = player.sum + score } model.players
+            List.setAt game.activePlayer { player | fours = Just score, sum = player.sum + score } game.players
 
         Fives ->
             let
                 score =
-                    scoreNumber model.dice Five
+                    scoreNumber game.dice Five
             in
-            List.setAt model.activePlayer { player | fives = Just score, sum = player.sum + score } model.players
+            List.setAt game.activePlayer { player | fives = Just score, sum = player.sum + score } game.players
 
         Sixes ->
             let
                 score =
-                    scoreNumber model.dice Six
+                    scoreNumber game.dice Six
             in
-            List.setAt model.activePlayer { player | sixes = Just score, sum = player.sum + score } model.players
+            List.setAt game.activePlayer { player | sixes = Just score, sum = player.sum + score } game.players
 
 
 scoreNumber : List Die -> DieFace -> Int
@@ -297,13 +321,13 @@ roll die =
         Random.map (\face -> Die face False) (Random.uniform One [ Two, Three, Four, Five, Six ])
 
 
-toggleHold : Model -> Int -> List Die
-toggleHold model diceIndex =
+toggleHold : GameState -> Int -> List Die
+toggleHold game diceIndex =
     let
         die =
-            List.getAt diceIndex model.dice
+            List.getAt diceIndex game.dice
     in
-    List.setAt diceIndex (toggleMaybeDie die) model.dice
+    List.setAt diceIndex (toggleMaybeDie die) game.dice
 
 
 toggleMaybeDie : Maybe Die -> Die
@@ -331,125 +355,131 @@ subscriptions model =
 
 view : Model -> Html Msg
 view model =
-    let
-        activePlayer =
-            Maybe.withDefault (newPlayer "unknown")
-                (List.getAt model.activePlayer model.players)
-    in
-    div []
-        [ div []
-            [ Svg.svg
-                [ SvgA.viewBox "0 0 600 100"
-                , SvgA.width "600"
-                , SvgA.height "100"
+    case model of
+        Menu ->
+            div []
+                [ button [] [ text "Start game" ] ]
+
+        Game game ->
+            let
+                activePlayer =
+                    Maybe.withDefault (newPlayer "unknown")
+                        (List.getAt game.activePlayer game.players)
+            in
+            div []
+                [ div []
+                    [ Svg.svg
+                        [ SvgA.viewBox "0 0 600 100"
+                        , SvgA.width "600"
+                        , SvgA.height "100"
+                        ]
+                        (dieOne 0 "purple"
+                            ++ dieTwo 100 "green"
+                            ++ dieThree 200 "blue"
+                            ++ dieFour 300 "deeppink"
+                            ++ dieFive 400 "orange"
+                            ++ dieSix 500 "red"
+                        )
+                    ]
+                , h1 [] [ text (activePlayer.name ++ "'s turn. Rolls left: " ++ String.fromInt game.rollsLeft) ]
+                , div [] (viewDice game)
+                , h1 [] [ text (viewDiceAsText game.dice) ]
+                , button [ onClick (clickRoll game) ] [ text "Roll" ]
+                , button [ onClick (clickSelectAll game) ] [ text "Hold all" ]
+                , button [ onClick UnselectAll ] [ text "Hold none" ]
+                , viewBoard game activePlayer
+                , div []
+                    [ Svg.svg
+                        [ SvgA.viewBox "0 0 600 100"
+                        , SvgA.width "600"
+                        , SvgA.height "100"
+                        ]
+                        (dieOne 0 "purple"
+                            ++ dieTwo 100 "green"
+                            ++ dieThree 200 "blue"
+                            ++ dieFour 300 "deeppink"
+                            ++ dieFive 400 "orange"
+                            ++ dieSix 500 "red"
+                        )
+                    ]
                 ]
-                (dieOne 0 "purple"
-                    ++ dieTwo 100 "green"
-                    ++ dieThree 200 "blue"
-                    ++ dieFour 300 "deeppink"
-                    ++ dieFive 400 "orange"
-                    ++ dieSix 500 "red"
-                )
-            ]
-        , h1 [] [ text (activePlayer.name ++ "'s turn. Rolls left: " ++ String.fromInt model.rollsLeft) ]
-        , div [] (viewDice model)
-        , h1 [] [ text (viewDiceAsText model.dice) ]
-        , button [ onClick (clickRoll model) ] [ text "Roll" ]
-        , button [ onClick (clickSelectAll model) ] [ text "Hold all" ]
-        , button [ onClick UnselectAll ] [ text "Hold none" ]
-        , viewBoard model activePlayer
-        , div []
-            [ Svg.svg
-                [ SvgA.viewBox "0 0 600 100"
-                , SvgA.width "600"
-                , SvgA.height "100"
-                ]
-                (dieOne 0 "purple"
-                    ++ dieTwo 100 "green"
-                    ++ dieThree 200 "blue"
-                    ++ dieFour 300 "deeppink"
-                    ++ dieFive 400 "orange"
-                    ++ dieSix 500 "red"
-                )
-            ]
-        ]
 
 
-clickRoll : Model -> Msg
-clickRoll model =
-    if model.rollsLeft <= 0 then
+clickRoll : GameState -> Msg
+clickRoll game =
+    if game.rollsLeft <= 0 then
         NoOp
 
     else
         Roll
 
 
-clickSelectAll : Model -> Msg
-clickSelectAll model =
-    if model.newRound then
+clickSelectAll : GameState -> Msg
+clickSelectAll game =
+    if game.newRound then
         NoOp
 
     else
         SelectAll
 
 
-viewBoard : Model -> Player -> Html Msg
-viewBoard model activePlayer =
+viewBoard : GameState -> Player -> Html Msg
+viewBoard game activePlayer =
     table []
         [ tr []
             ([ th [] []
              , th [] [ text "Players" ]
              ]
-                ++ List.map viewPlayerName model.players
+                ++ List.map viewPlayerName game.players
             )
         , tr []
-            ([ td [] [ button [ onClick (clickScoreButton model activePlayer.ones Ones) ] [ text "Score" ] ]
+            ([ td [] [ button [ onClick (clickScoreButton game activePlayer.ones Ones) ] [ text "Score" ] ]
              , th [] [ text "Ones" ]
              ]
-                ++ List.map viewScore (List.map .ones model.players)
+                ++ List.map viewScore (List.map .ones game.players)
             )
         , tr []
-            ([ td [] [ button [ onClick (clickScoreButton model activePlayer.twos Twos) ] [ text "Score" ] ]
+            ([ td [] [ button [ onClick (clickScoreButton game activePlayer.twos Twos) ] [ text "Score" ] ]
              , th [] [ text "Twos" ]
              ]
-                ++ List.map viewScore (List.map .twos model.players)
+                ++ List.map viewScore (List.map .twos game.players)
             )
         , tr []
-            ([ td [] [ button [ onClick (clickScoreButton model activePlayer.threes Threes) ] [ text "Score" ] ]
+            ([ td [] [ button [ onClick (clickScoreButton game activePlayer.threes Threes) ] [ text "Score" ] ]
              , th [] [ text "Threes" ]
              ]
-                ++ List.map viewScore (List.map .threes model.players)
+                ++ List.map viewScore (List.map .threes game.players)
             )
         , tr []
-            ([ td [] [ button [ onClick (clickScoreButton model activePlayer.fours Fours) ] [ text "Score" ] ]
+            ([ td [] [ button [ onClick (clickScoreButton game activePlayer.fours Fours) ] [ text "Score" ] ]
              , th [] [ text "Fours" ]
              ]
-                ++ List.map viewScore (List.map .fours model.players)
+                ++ List.map viewScore (List.map .fours game.players)
             )
         , tr []
-            ([ td [] [ button [ onClick (clickScoreButton model activePlayer.fives Fives) ] [ text "Score" ] ]
+            ([ td [] [ button [ onClick (clickScoreButton game activePlayer.fives Fives) ] [ text "Score" ] ]
              , th [] [ text "Fives" ]
              ]
-                ++ List.map viewScore (List.map .fives model.players)
+                ++ List.map viewScore (List.map .fives game.players)
             )
         , tr []
-            ([ td [] [ button [ onClick (clickScoreButton model activePlayer.sixes Sixes) ] [ text "Score" ] ]
+            ([ td [] [ button [ onClick (clickScoreButton game activePlayer.sixes Sixes) ] [ text "Score" ] ]
              , th [] [ text "Sixes" ]
              ]
-                ++ List.map viewScore (List.map .sixes model.players)
+                ++ List.map viewScore (List.map .sixes game.players)
             )
         , tr []
             ([ td [] []
              , th [] [ text "Sum" ]
              ]
-                ++ List.map viewSum (List.map .sum model.players)
+                ++ List.map viewSum (List.map .sum game.players)
             )
         ]
 
 
-clickScoreButton : Model -> Maybe Int -> Category -> Msg
-clickScoreButton model maybeScore category =
-    if maybeScore /= Nothing || model.newRound then
+clickScoreButton : GameState -> Maybe Int -> Category -> Msg
+clickScoreButton game maybeScore category =
+    if maybeScore /= Nothing || game.newRound then
         NoOp
 
     else
@@ -490,15 +520,15 @@ viewDiceAsText dice =
         |> String.concat
 
 
-viewDice : Model -> List (Html Msg)
-viewDice model =
-    List.indexedMap Tuple.pair model.dice |> List.map (viewDiceSpan model)
+viewDice : GameState -> List (Html Msg)
+viewDice game =
+    List.indexedMap Tuple.pair game.dice |> List.map (viewDiceSpan game)
 
 
-viewDiceSpan : Model -> ( Int, Die ) -> Html Msg
-viewDiceSpan model ( dieIndex, die ) =
+viewDiceSpan : GameState -> ( Int, Die ) -> Html Msg
+viewDiceSpan game ( dieIndex, die ) =
     Svg.svg
-        [ onClick (clickToggleHold dieIndex model.newRound)
+        [ onClick (clickToggleHold dieIndex game.newRound)
         , SvgA.viewBox "0 0 100 100"
         , SvgA.width "100"
         , SvgA.height "100"
