@@ -37,7 +37,7 @@ main =
 
 
 type alias Model =
-    { dice : Array Dice
+    { dice : Array Die
     , players : List Player
     , activePlayer : Int
     , rollsLeft : Int
@@ -45,8 +45,18 @@ type alias Model =
     }
 
 
-type alias Dice =
-    { value : Int, held : Bool }
+type alias Die =
+    { face : DieFace, held : Bool }
+
+
+type DieFace
+    = One
+    | Two
+    | Three
+    | Four
+    | Five
+    | Six
+    | Blank
 
 
 type alias Player =
@@ -90,7 +100,7 @@ testPlayer playerName oneTest sumTest =
 init : () -> ( Model, Cmd Msg )
 init _ =
     ( Model
-        (Array.repeat 5 (Dice 1 False))
+        (Array.repeat 5 (Die Blank False))
         [ newPlayer "Player 1"
         , newPlayer "Player 2"
         ]
@@ -108,7 +118,7 @@ init _ =
 type Msg
     = NoOp
     | Roll
-    | NewDice (List Dice)
+    | NewDice (List Die)
     | ToggleHold Int
     | SelectAll
     | UnselectAll
@@ -189,52 +199,78 @@ scorePlayer model category =
         Ones ->
             let
                 score =
-                    scoreNumber model.dice 1
+                    scoreNumber model.dice One
             in
             List.setAt model.activePlayer { player | ones = Just score, sum = player.sum + score } model.players
 
         Twos ->
             let
                 score =
-                    scoreNumber model.dice 2
+                    scoreNumber model.dice Two
             in
             List.setAt model.activePlayer { player | twos = Just score, sum = player.sum + score } model.players
 
         Threes ->
             let
                 score =
-                    scoreNumber model.dice 3
+                    scoreNumber model.dice Three
             in
             List.setAt model.activePlayer { player | threes = Just score, sum = player.sum + score } model.players
 
         Fours ->
             let
                 score =
-                    scoreNumber model.dice 4
+                    scoreNumber model.dice Four
             in
             List.setAt model.activePlayer { player | fours = Just score, sum = player.sum + score } model.players
 
         Fives ->
             let
                 score =
-                    scoreNumber model.dice 5
+                    scoreNumber model.dice Five
             in
             List.setAt model.activePlayer { player | fives = Just score, sum = player.sum + score } model.players
 
         Sixes ->
             let
                 score =
-                    scoreNumber model.dice 6
+                    scoreNumber model.dice Six
             in
             List.setAt model.activePlayer { player | sixes = Just score, sum = player.sum + score } model.players
 
 
-scoreNumber : Array Dice -> Int -> Int
-scoreNumber dice number =
+scoreNumber : Array Die -> DieFace -> Int
+scoreNumber dice face =
     Array.toList dice
-        |> List.map .value
-        |> List.filter (\value -> value == number)
+        |> List.map .face
+        |> List.filter (\dieFace -> dieFace == face)
+        |> List.map dieToint
         |> List.sum
+
+
+dieToint : DieFace -> Int
+dieToint face =
+    case face of
+        One ->
+            1
+
+        Two ->
+            2
+
+        Three ->
+            3
+
+        Four ->
+            4
+
+        Five ->
+            5
+
+        Six ->
+            6
+
+        Blank ->
+            0
 
 
 canHasPlayer : Maybe Player -> Player
@@ -247,37 +283,37 @@ canHasPlayer maybePlayer =
             player
 
 
-rollDice : Array Dice -> Random.Generator (List Dice)
+rollDice : Array Die -> Random.Generator (List Die)
 rollDice dice =
     Array.toList dice |> List.map roll |> Random.Extra.sequence
 
 
-roll : Dice -> Random.Generator Dice
+roll : Die -> Random.Generator Die
 roll die =
     if die.held then
-        Random.map (\value -> Dice value True) (Random.constant die.value)
+        Random.map (\face -> Die face True) (Random.constant die.face)
 
     else
-        Random.map (\value -> Dice value False) (Random.int 1 6)
+        Random.map (\face -> Die face False) (Random.uniform One [ Two, Three, Four, Five, Six ])
 
 
-toggleHold : Model -> Int -> Array Dice
+toggleHold : Model -> Int -> Array Die
 toggleHold model diceIndex =
     let
         die =
             Array.get diceIndex model.dice
     in
-    Array.set diceIndex (canHasDice die) model.dice
+    Array.set diceIndex (toggleMaybeDie die) model.dice
 
 
-canHasDice : Maybe Dice -> Dice
-canHasDice maybeDie =
+toggleMaybeDie : Maybe Die -> Die
+toggleMaybeDie maybeDie =
     case maybeDie of
         Nothing ->
-            Dice 7 False
+            Die Blank False
 
         Just die ->
-            Dice die.value (not die.held)
+            Die die.face (not die.held)
 
 
 
@@ -431,10 +467,11 @@ viewPlayerName player =
     th [] [ text player.name ]
 
 
-viewDiceAsText : Array Dice -> String
+viewDiceAsText : Array Die -> String
 viewDiceAsText dice =
     Array.toList dice
-        |> List.map (\aDie -> aDie.value)
+        |> List.map (\aDie -> aDie.face)
+        |> List.map dieToint
         |> List.map String.fromInt
         |> List.intersperse ", "
         |> String.concat
@@ -445,7 +482,7 @@ viewDice model =
     Array.toIndexedList model.dice |> List.map (viewDiceSpan model)
 
 
-viewDiceSpan : Model -> ( Int, Dice ) -> Html Msg
+viewDiceSpan : Model -> ( Int, Die ) -> Html Msg
 viewDiceSpan model ( dieIndex, die ) =
     Svg.svg
         [ onClick (clickToggleHold dieIndex model.newRound)
@@ -465,7 +502,7 @@ clickToggleHold dieIndex newRound =
         ToggleHold dieIndex
 
 
-pickDie : Dice -> List (Svg Msg)
+pickDie : Die -> List (Svg Msg)
 pickDie die =
     let
         color =
@@ -475,35 +512,35 @@ pickDie die =
             else
                 "black"
     in
-    case die.value of
-        1 ->
+    case die.face of
+        One ->
             dieOne 0 color
 
-        2 ->
+        Two ->
             dieTwo 0 color
 
-        3 ->
+        Three ->
             dieThree 0 color
 
-        4 ->
+        Four ->
             dieFour 0 color
 
-        5 ->
+        Five ->
             dieFive 0 color
 
-        6 ->
+        Six ->
             dieSix 0 color
 
-        _ ->
-            dieBlanc 0 "red"
+        Blank ->
+            dieBlank 0 "black"
 
 
 
 -- SVG ASSETS
 
 
-dieBlanc : Int -> String -> List (Svg Msg)
-dieBlanc xpos color =
+dieBlank : Int -> String -> List (Svg Msg)
+dieBlank xpos color =
     [ dieBox (xpos + 5) color ]
 
 
