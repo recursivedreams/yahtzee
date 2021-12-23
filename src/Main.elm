@@ -35,7 +35,7 @@ main =
 init : () -> ( Model, Cmd Msg )
 init _ =
     ( Model
-        (Array.repeat 5 (Die Blank False))
+        (List.repeat 5 (Die Blank False))
         [ newPlayer "Player 1"
         , newPlayer "Player 2"
         ]
@@ -51,7 +51,7 @@ init _ =
 
 
 type alias Model =
-    { dice : Array Die
+    { dice : List Die
     , players : List Player
     , activePlayer : Int
     , rollsLeft : Int
@@ -147,7 +147,7 @@ update msg model =
 
         NewDice newDice ->
             ( { model
-                | dice = Array.fromList newDice
+                | dice = newDice
                 , rollsLeft = model.rollsLeft - 1
                 , newRound = False
               }
@@ -160,18 +160,18 @@ update msg model =
             )
 
         SelectAll ->
-            ( { model | dice = Array.map (\die -> { die | held = True }) model.dice }
+            ( { model | dice = List.map (\die -> { die | held = True }) model.dice }
             , Cmd.none
             )
 
         UnselectAll ->
-            ( { model | dice = Array.map (\die -> { die | held = False }) model.dice }
+            ( { model | dice = List.map (\die -> { die | held = False }) model.dice }
             , Cmd.none
             )
 
         Score category ->
             ( { model
-                | dice = Array.repeat 5 (Die Blank False)
+                | dice = List.repeat 5 (Die Blank False)
                 , players = scorePlayer model category
                 , activePlayer = nextPlayer model.activePlayer (List.length model.players)
                 , rollsLeft = 3
@@ -240,10 +240,9 @@ scorePlayer model category =
             List.setAt model.activePlayer { player | sixes = Just score, sum = player.sum + score } model.players
 
 
-scoreNumber : Array Die -> DieFace -> Int
+scoreNumber : List Die -> DieFace -> Int
 scoreNumber dice face =
-    Array.toList dice
-        |> List.map .face
+    List.map .face dice
         |> List.filter (\dieFace -> dieFace == face)
         |> List.map dieToint
         |> List.sum
@@ -284,9 +283,9 @@ canHasPlayer maybePlayer =
             player
 
 
-rollDice : Array Die -> Random.Generator (List Die)
+rollDice : List Die -> Random.Generator (List Die)
 rollDice dice =
-    Array.toList dice |> List.map roll |> Random.Extra.sequence
+    List.map roll dice |> Random.Extra.sequence
 
 
 roll : Die -> Random.Generator Die
@@ -298,13 +297,13 @@ roll die =
         Random.map (\face -> Die face False) (Random.uniform One [ Two, Three, Four, Five, Six ])
 
 
-toggleHold : Model -> Int -> Array Die
+toggleHold : Model -> Int -> List Die
 toggleHold model diceIndex =
     let
         die =
-            Array.get diceIndex model.dice
+            List.getAt diceIndex model.dice
     in
-    Array.set diceIndex (toggleMaybeDie die) model.dice
+    List.setAt diceIndex (toggleMaybeDie die) model.dice
 
 
 toggleMaybeDie : Maybe Die -> Die
@@ -482,10 +481,9 @@ viewPlayerName player =
     th [] [ text player.name ]
 
 
-viewDiceAsText : Array Die -> String
+viewDiceAsText : List Die -> String
 viewDiceAsText dice =
-    Array.toList dice
-        |> List.map (\aDie -> aDie.face)
+    List.map (\aDie -> aDie.face) dice
         |> List.map dieToint
         |> List.map String.fromInt
         |> List.intersperse ", "
@@ -494,7 +492,7 @@ viewDiceAsText dice =
 
 viewDice : Model -> List (Html Msg)
 viewDice model =
-    Array.toIndexedList model.dice |> List.map (viewDiceSpan model)
+    List.indexedMap Tuple.pair model.dice |> List.map (viewDiceSpan model)
 
 
 viewDiceSpan : Model -> ( Int, Die ) -> Html Msg
