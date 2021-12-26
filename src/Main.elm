@@ -10,7 +10,7 @@ import Html.Events exposing (..)
 import List
 import List.Extra as List
 import Random
-import Random.Extra
+import Random.Extra as Random
 import String
 import Svg exposing (Svg)
 import Svg.Attributes as SvgA
@@ -35,17 +35,6 @@ init _ =
     ( newGame
     , Cmd.none
     )
-
-
-
--- MODEL
--- type alias Model =
---     { dice : List Die
---     , players : List Player
---     , activePlayer : Int
---     , rollsLeft : Int
---     , newRound : Bool
---     }
 
 
 type Model
@@ -137,11 +126,12 @@ testPlayer playerName oneTest sumTest =
     }
 
 
-
--- UPDATE
-
-
 type Msg
+    = MenuMsg
+    | GameMsg GameSubMsg
+
+
+type GameSubMsg
     = NoOp
     | Roll
     | NewDice (List Die)
@@ -157,52 +147,67 @@ update msg model =
         Menu ->
             ( model, Cmd.none )
 
-        Game game ->
-            case msg of
-                NoOp ->
-                    ( model, Cmd.none )
+        Game gameState ->
+            updateGame (Maybe.withDefault NoOp (unwrapGameMsg msg)) gameState
 
-                Roll ->
-                    ( model
-                    , Random.generate NewDice (rollDice game.dice)
-                    )
 
-                NewDice newDice ->
-                    ( Game
-                        { game
-                            | dice = newDice
-                            , rollsLeft = game.rollsLeft - 1
-                            , newRound = False
-                        }
-                    , Cmd.none
-                    )
+unwrapGameMsg : Msg -> Maybe GameSubMsg
+unwrapGameMsg msg =
+    case msg of
+        MenuMsg ->
+            Nothing
 
-                ToggleHold diceIndex ->
-                    ( Game { game | dice = toggleHold game diceIndex }
-                    , Cmd.none
-                    )
+        GameMsg subMsg ->
+            Just subMsg
 
-                SelectAll ->
-                    ( Game { game | dice = List.map (\die -> { die | held = True }) game.dice }
-                    , Cmd.none
-                    )
 
-                UnselectAll ->
-                    ( Game { game | dice = List.map (\die -> { die | held = False }) game.dice }
-                    , Cmd.none
-                    )
+updateGame : GameSubMsg -> GameState -> ( Model, Cmd Msg )
+updateGame msg gameState =
+    case msg of
+        NoOp ->
+            ( Game gameState, Cmd.none )
 
-                Score category ->
-                    ( Game
-                        { game
-                            | dice = List.repeat 5 (Die Blank False)
-                            , players = scorePlayer game category
-                            , activePlayer = nextPlayer game.activePlayer (List.length game.players)
-                            , rollsLeft = 3
-                            , newRound = True
-                        }
-                    , Cmd.none
-                    )
+        Roll ->
+            ( Game gameState
+            , Random.generate GameMsg (newDiceGenerator gameState.dice)
+            )
+
+        NewDice newDice ->
+            ( Game
+                { gameState
+                    | dice = newDice
+                    , rollsLeft = gameState.rollsLeft - 1
+                    , newRound = False
+                }
+            , Cmd.none
+            )
+
+        ToggleHold diceIndex ->
+            ( Game { gameState | dice = toggleHold gameState diceIndex }
+            , Cmd.none
+            )
+
+        SelectAll ->
+            ( Game { gameState | dice = List.map (\die -> { die | held = True }) gameState.dice }
+            , Cmd.none
+            )
+
+        UnselectAll ->
+            ( Game { gameState | dice = List.map (\die -> { die | held = False }) gameState.dice }
+            , Cmd.none
+            )
+
+        Score category ->
+            ( Game
+                { gameState
+                    | dice = List.repeat 5 (Die Blank False)
+                    , players = scorePlayer gameState category
+                    , activePlayer = nextPlayer gameState.activePlayer (List.length gameState.players)
+                    , rollsLeft = 3
+                    , newRound = True
+                }
+            , Cmd.none
+            )
 
 
 nextPlayer : Int -> Int -> Int
@@ -307,9 +312,14 @@ canHasPlayer maybePlayer =
             player
 
 
+newDiceGenerator : List Die -> Random.Generator GameSubMsg
+newDiceGenerator dice =
+    Random.map (\newDice -> NewDice newDice) (rollDice dice)
+
+
 rollDice : List Die -> Random.Generator (List Die)
 rollDice dice =
-    List.map roll dice |> Random.Extra.sequence
+    List.map roll dice |> Random.sequence
 
 
 roll : Die -> Random.Generator Die
@@ -386,7 +396,7 @@ view model =
                 , h1 [] [ text (viewDiceAsText game.dice) ]
                 , button [ onClick (clickRoll game) ] [ text "Roll" ]
                 , button [ onClick (clickSelectAll game) ] [ text "Hold all" ]
-                , button [ onClick UnselectAll ] [ text "Hold none" ]
+                , button [ onClick (GameMsg UnselectAll) ] [ text "Hold none" ]
                 , viewBoard game activePlayer
                 , div []
                     [ Svg.svg
@@ -406,84 +416,84 @@ view model =
 
 
 clickRoll : GameState -> Msg
-clickRoll game =
-    if game.rollsLeft <= 0 then
-        NoOp
+clickRoll gameState =
+    if gameState.rollsLeft <= 0 then
+        GameMsg NoOp
 
     else
-        Roll
+        GameMsg Roll
 
 
 clickSelectAll : GameState -> Msg
-clickSelectAll game =
-    if game.newRound then
-        NoOp
+clickSelectAll gameState =
+    if gameState.newRound then
+        GameMsg NoOp
 
     else
-        SelectAll
+        GameMsg SelectAll
 
 
 viewBoard : GameState -> Player -> Html Msg
-viewBoard game activePlayer =
+viewBoard gameState activePlayer =
     table []
         [ tr []
             ([ th [] []
              , th [] [ text "Players" ]
              ]
-                ++ List.map viewPlayerName game.players
+                ++ List.map viewPlayerName gameState.players
             )
         , tr []
-            ([ td [] [ button [ onClick (clickScoreButton game activePlayer.ones Ones) ] [ text "Score" ] ]
+            ([ td [] [ button [ onClick (clickScoreButton gameState activePlayer.ones Ones) ] [ text "Score" ] ]
              , th [] [ text "Ones" ]
              ]
-                ++ List.map viewScore (List.map .ones game.players)
+                ++ List.map viewScore (List.map .ones gameState.players)
             )
         , tr []
-            ([ td [] [ button [ onClick (clickScoreButton game activePlayer.twos Twos) ] [ text "Score" ] ]
+            ([ td [] [ button [ onClick (clickScoreButton gameState activePlayer.twos Twos) ] [ text "Score" ] ]
              , th [] [ text "Twos" ]
              ]
-                ++ List.map viewScore (List.map .twos game.players)
+                ++ List.map viewScore (List.map .twos gameState.players)
             )
         , tr []
-            ([ td [] [ button [ onClick (clickScoreButton game activePlayer.threes Threes) ] [ text "Score" ] ]
+            ([ td [] [ button [ onClick (clickScoreButton gameState activePlayer.threes Threes) ] [ text "Score" ] ]
              , th [] [ text "Threes" ]
              ]
-                ++ List.map viewScore (List.map .threes game.players)
+                ++ List.map viewScore (List.map .threes gameState.players)
             )
         , tr []
-            ([ td [] [ button [ onClick (clickScoreButton game activePlayer.fours Fours) ] [ text "Score" ] ]
+            ([ td [] [ button [ onClick (clickScoreButton gameState activePlayer.fours Fours) ] [ text "Score" ] ]
              , th [] [ text "Fours" ]
              ]
-                ++ List.map viewScore (List.map .fours game.players)
+                ++ List.map viewScore (List.map .fours gameState.players)
             )
         , tr []
-            ([ td [] [ button [ onClick (clickScoreButton game activePlayer.fives Fives) ] [ text "Score" ] ]
+            ([ td [] [ button [ onClick (clickScoreButton gameState activePlayer.fives Fives) ] [ text "Score" ] ]
              , th [] [ text "Fives" ]
              ]
-                ++ List.map viewScore (List.map .fives game.players)
+                ++ List.map viewScore (List.map .fives gameState.players)
             )
         , tr []
-            ([ td [] [ button [ onClick (clickScoreButton game activePlayer.sixes Sixes) ] [ text "Score" ] ]
+            ([ td [] [ button [ onClick (clickScoreButton gameState activePlayer.sixes Sixes) ] [ text "Score" ] ]
              , th [] [ text "Sixes" ]
              ]
-                ++ List.map viewScore (List.map .sixes game.players)
+                ++ List.map viewScore (List.map .sixes gameState.players)
             )
         , tr []
             ([ td [] []
              , th [] [ text "Sum" ]
              ]
-                ++ List.map viewSum (List.map .sum game.players)
+                ++ List.map viewSum (List.map .sum gameState.players)
             )
         ]
 
 
 clickScoreButton : GameState -> Maybe Int -> Category -> Msg
-clickScoreButton game maybeScore category =
-    if maybeScore /= Nothing || game.newRound then
-        NoOp
+clickScoreButton gameState maybeScore category =
+    if maybeScore /= Nothing || gameState.newRound then
+        GameMsg NoOp
 
     else
-        Score category
+        GameMsg (Score category)
 
 
 viewSum : Int -> Html Msg
@@ -521,14 +531,14 @@ viewDiceAsText dice =
 
 
 viewDice : GameState -> List (Html Msg)
-viewDice game =
-    List.indexedMap Tuple.pair game.dice |> List.map (viewDiceSpan game)
+viewDice gameState =
+    List.indexedMap Tuple.pair gameState.dice |> List.map (viewDiceSpan gameState)
 
 
 viewDiceSpan : GameState -> ( Int, Die ) -> Html Msg
-viewDiceSpan game ( dieIndex, die ) =
+viewDiceSpan gameState ( dieIndex, die ) =
     Svg.svg
-        [ onClick (clickToggleHold dieIndex game.newRound)
+        [ onClick (clickToggleHold dieIndex gameState.newRound)
         , SvgA.viewBox "0 0 100 100"
         , SvgA.width "100"
         , SvgA.height "100"
@@ -539,10 +549,10 @@ viewDiceSpan game ( dieIndex, die ) =
 clickToggleHold : Int -> Bool -> Msg
 clickToggleHold dieIndex newRound =
     if newRound then
-        NoOp
+        GameMsg NoOp
 
     else
-        ToggleHold dieIndex
+        GameMsg (ToggleHold dieIndex)
 
 
 pickDie : Die -> List (Svg Msg)
