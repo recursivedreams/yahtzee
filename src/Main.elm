@@ -1,18 +1,19 @@
 -- A simple yahtzee game
 
 
-module Main exposing (..)
+module Main exposing (main)
 
 import Browser
+import Debug exposing (log)
 import Html exposing (..)
-import Html.Attributes as HtmlA
-import Html.Events exposing (..)
+import Html.Attributes as A
+import Html.Events exposing (onClick, onInput)
 import List
 import List.Extra as List
 import Random
 import Random.Extra as Random
 import String
-import Svg exposing (Svg)
+import Svg exposing (Svg, svg)
 import Svg.Attributes as SvgA
 
 
@@ -32,14 +33,24 @@ main =
 
 init : () -> ( Model, Cmd Msg )
 init _ =
-    ( newGame
+    ( Menu { players = [ createNewPlayer 0 ], idCount = 1 }
     , Cmd.none
     )
 
 
 type Model
-    = Menu
+    = Menu MenuState
     | Game GameState
+
+
+type alias MenuState =
+    { players : List PlayerCreation
+    , idCount : Int
+    }
+
+
+type alias PlayerCreation =
+    { name : String, playerId : Int, isAdded : Bool }
 
 
 type alias GameState =
@@ -51,18 +62,24 @@ type alias GameState =
     }
 
 
-newGame : Model
-newGame =
-    Game
-        { dice = List.repeat 5 (Die Blank False)
-        , players =
-            [ newPlayer "Player 1"
-            , newPlayer "Player 2"
-            ]
-        , activePlayer = 0
-        , rollsLeft = 3
-        , newRound = True
-        }
+createNewPlayer : Int -> PlayerCreation
+createNewPlayer id =
+    PlayerCreation "" id False
+
+
+
+-- newGame : Model
+-- newGame =
+--     Game
+--         { dice = List.repeat 5 (Die Blank False)
+--         , players =
+--             [ newPlayer "Player 1"
+--             , newPlayer "Player 2"
+--             ]
+--         , activePlayer = 0
+--         , rollsLeft = 3
+--         , newRound = True
+--         }
 
 
 type alias Die =
@@ -127,8 +144,16 @@ testPlayer playerName oneTest sumTest =
 
 
 type Msg
-    = MenuMsg
+    = MenuMsg MenuSubMsg
     | GameMsg GameSubMsg
+
+
+type MenuSubMsg
+    = MenuNoOp
+    | UpdatePlayerName Int String
+    | AddPlayer Int
+    | MorePlayers
+    | StartGame
 
 
 type GameSubMsg
@@ -144,21 +169,100 @@ type GameSubMsg
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case model of
-        Menu ->
-            ( model, Cmd.none )
+        Menu menuState ->
+            updateMenu (Maybe.withDefault MenuNoOp (unwrapMenuMsg msg)) menuState
 
         Game gameState ->
             updateGame (Maybe.withDefault NoOp (unwrapGameMsg msg)) gameState
 
 
+unwrapMenuMsg : Msg -> Maybe MenuSubMsg
+unwrapMenuMsg msg =
+    case msg of
+        GameMsg _ ->
+            Nothing
+
+        MenuMsg subMsg ->
+            Just subMsg
+
+
 unwrapGameMsg : Msg -> Maybe GameSubMsg
 unwrapGameMsg msg =
     case msg of
-        MenuMsg ->
+        MenuMsg _ ->
             Nothing
 
         GameMsg subMsg ->
             Just subMsg
+
+
+updateMenu : MenuSubMsg -> MenuState -> ( Model, Cmd Msg )
+updateMenu msg menuState =
+    case msg of
+        MenuNoOp ->
+            ( Menu menuState, Cmd.none )
+
+        UpdatePlayerName id text ->
+            ( Menu { menuState | players = updatePlayerName id text menuState.players }, Cmd.none )
+
+        AddPlayer id ->
+            let
+                addPlayer player =
+                    if player.playerId == id then
+                        { player | isAdded = True }
+
+                    else
+                        player
+            in
+            ( Menu { menuState | players = List.map addPlayer menuState.players }, Cmd.none )
+
+        MorePlayers ->
+            ( Menu
+                { menuState
+                    | players = List.append menuState.players [ createNewPlayer menuState.idCount ]
+                    , idCount = menuState.idCount + 1
+                }
+            , Cmd.none
+            )
+
+        StartGame ->
+            ( startGame menuState.players, Cmd.none )
+
+
+updatePlayerName : Int -> String -> List PlayerCreation -> List PlayerCreation
+updatePlayerName id text players =
+    List.map (updateName id text) players
+
+
+updateName : Int -> String -> PlayerCreation -> PlayerCreation
+updateName id text player =
+    if player.playerId == id then
+        let
+            log1 =
+                log "input" player.name
+        in
+        { player | name = text }
+
+    else
+        player
+
+
+startGame : List PlayerCreation -> Model
+startGame players =
+    List.filter (\player -> player.isAdded) players
+        |> List.map .name
+        |> newGame
+
+
+newGame : List String -> Model
+newGame players =
+    Game
+        { dice = List.repeat 5 (Die Blank False)
+        , players = List.map newPlayer players
+        , activePlayer = 0
+        , rollsLeft = 3
+        , newRound = True
+        }
 
 
 updateGame : GameSubMsg -> GameState -> ( Model, Cmd Msg )
@@ -366,53 +470,113 @@ subscriptions model =
 view : Model -> Html Msg
 view model =
     case model of
-        Menu ->
-            div []
-                [ button [] [ text "Start game" ] ]
+        Menu menuState ->
+            viewMenu menuState
 
-        Game game ->
-            let
-                activePlayer =
-                    Maybe.withDefault (newPlayer "unknown")
-                        (List.getAt game.activePlayer game.players)
-            in
-            div []
-                [ div []
-                    [ Svg.svg
-                        [ SvgA.viewBox "0 0 600 100"
-                        , SvgA.width "600"
-                        , SvgA.height "100"
-                        ]
-                        (dieOne 0 "purple"
-                            ++ dieTwo 100 "green"
-                            ++ dieThree 200 "blue"
-                            ++ dieFour 300 "deeppink"
-                            ++ dieFive 400 "orange"
-                            ++ dieSix 500 "red"
-                        )
-                    ]
-                , h1 [] [ text (activePlayer.name ++ "'s turn. Rolls left: " ++ String.fromInt game.rollsLeft) ]
-                , div [] (viewDice game)
-                , h1 [] [ text (viewDiceAsText game.dice) ]
-                , button [ onClick (clickRoll game) ] [ text "Roll" ]
-                , button [ onClick (clickSelectAll game) ] [ text "Hold all" ]
-                , button [ onClick (GameMsg UnselectAll) ] [ text "Hold none" ]
-                , viewBoard game activePlayer
-                , div []
-                    [ Svg.svg
-                        [ SvgA.viewBox "0 0 600 100"
-                        , SvgA.width "600"
-                        , SvgA.height "100"
-                        ]
-                        (dieOne 0 "purple"
-                            ++ dieTwo 100 "green"
-                            ++ dieThree 200 "blue"
-                            ++ dieFour 300 "deeppink"
-                            ++ dieFive 400 "orange"
-                            ++ dieSix 500 "red"
-                        )
-                    ]
+        Game gameState ->
+            viewGame gameState
+
+
+viewMenu : MenuState -> Html Msg
+viewMenu menuState =
+    div []
+        ([ h1 [] [ text "Yahtzee!" ] ]
+            ++ playerFields menuState
+            ++ [ div [] [ button [ onClick (MenuMsg MorePlayers) ] [ text "More players" ], span [] [ text "Sometext" ] ]
+               , div [] [ button [ onClick (MenuMsg StartGame) ] [ text "Start game" ] ]
+               ]
+        )
+
+
+playerFields : MenuState -> List (Html Msg)
+playerFields menuState =
+    List.map updateNewPlayer menuState.players
+
+
+updateNewPlayer : PlayerCreation -> Html Msg
+updateNewPlayer player =
+    if player.isAdded then
+        div [] [ text player.name ]
+
+    else
+        div []
+            [ input
+                [ A.type_ "text"
+                , A.placeholder "Player name"
+                , A.autofocus True
+                , onInput (\text -> MenuMsg (UpdatePlayerName player.playerId text))
                 ]
+                []
+            , button
+                [ onClick (MenuMsg (AddPlayer player.playerId))
+                ]
+                [ text "Add player" ]
+            ]
+
+
+
+-- if players == [] then
+--     [ div []
+--         [ input
+--             [ A.type_ "text"
+--             , A.placeholder "Player name"
+--             , A.autofocus True
+--             ]
+--             []
+--         , button
+--             [ onClick (MenuMsg MenuNoOp)
+--             ]
+--             [ text "Add player" ]
+--         ]
+--     ]
+-- else
+--     [ div [] [ text "Something went wrong" ] ]
+
+
+viewGame : GameState -> Html Msg
+viewGame gameState =
+    let
+        activePlayer =
+            Maybe.withDefault (newPlayer "unknown")
+                (List.getAt gameState.activePlayer gameState.players)
+    in
+    div []
+        [ div []
+            [ svg
+                [ SvgA.viewBox "0 0 600 100"
+                , SvgA.width "600"
+                , SvgA.height "100"
+                ]
+                (dieOne 0 "purple"
+                    ++ dieTwo 100 "green"
+                    ++ dieThree 200 "blue"
+                    ++ dieFour 300 "deeppink"
+                    ++ dieFive 400 "orange"
+                    ++ dieSix 500 "red"
+                )
+            ]
+        , h1 [] [ text (activePlayer.name ++ "'s turn. Rolls left: " ++ String.fromInt gameState.rollsLeft) ]
+        , div [] (viewDice gameState)
+        , h1 [] [ text (viewDiceAsText gameState.dice) ]
+        , button [ onClick (clickRoll gameState) ] [ text "Roll" ]
+        , button [ onClick (clickSelectAll gameState) ] [ text "Hold all" ]
+        , button [ onClick (GameMsg UnselectAll) ] [ text "Hold none" ]
+        , viewBoard gameState activePlayer
+        , div []
+            [ svg
+                [ SvgA.viewBox "0 0 600 100"
+                , SvgA.width "600"
+                , SvgA.height "100"
+                ]
+                (dieOne 0 "purple"
+                    ++ dieTwo 100 "green"
+                    ++ dieThree 200 "blue"
+                    ++ dieFour 300 "deeppink"
+                    ++ dieFive 400 "orange"
+                    ++ dieSix 500 "red"
+                )
+            ]
+        ]
 
 
 clickRoll : GameState -> Msg
@@ -510,7 +674,7 @@ viewScoreString : Maybe Int -> String
 viewScoreString maybeScore =
     case maybeScore of
         Nothing ->
-            "(no score)"
+            ""
 
         Just score ->
             String.fromInt score
@@ -537,7 +701,7 @@ viewDice gameState =
 
 viewDiceSpan : GameState -> ( Int, Die ) -> Html Msg
 viewDiceSpan gameState ( dieIndex, die ) =
-    Svg.svg
+    svg
         [ onClick (clickToggleHold dieIndex gameState.newRound)
         , SvgA.viewBox "0 0 100 100"
         , SvgA.width "100"
