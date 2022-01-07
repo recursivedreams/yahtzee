@@ -76,21 +76,6 @@ createNewPlayer id =
     PlayerCreation "" id False
 
 
-
--- newGame : Model
--- newGame =
---     Game
---         { dice = List.repeat 5 (Die Blank False)
---         , players =
---             [ newPlayer "Player 1"
---             , newPlayer "Player 2"
---             ]
---         , activePlayer = 0
---         , rollsLeft = 3
---         , newRound = True
---         }
-
-
 type alias Die =
     { face : DieFace, held : Bool }
 
@@ -164,7 +149,7 @@ type MenuSubMsg
     = MenuNoOp
     | UpdatePlayerName Int String
     | RemovePlayer Int
-    | MorePlayers
+    | AddPlayer
     | StartGame
 
 
@@ -231,7 +216,7 @@ updateMenu msg players =
             , Cmd.none
             )
 
-        MorePlayers ->
+        AddPlayer ->
             ( Menu <| players ++ [ "" ]
             , Cmd.none
             )
@@ -511,7 +496,7 @@ viewMenu players =
     div []
         ([ h1 [] [ text "Yahtzee!" ] ]
             ++ List.indexedMap viewPlayerField players
-            ++ [ div [] [ button [ onClick (MenuMsg MorePlayers) ] [ text "Add another player" ] ]
+            ++ [ div [] [ button [ onClick (MenuMsg AddPlayer) ] [ text "Add another player" ] ]
                , div [] [ button [ onClick (MenuMsg StartGame) ] [ text "Start game" ] ]
                ]
         )
