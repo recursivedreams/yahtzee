@@ -33,7 +33,7 @@ main =
 
 init : () -> ( Model, Cmd Msg )
 init _ =
-    ( Menu { players = [ createNewPlayer 0 ], idCount = 1 }
+    ( Menu [ "" ]
     , Cmd.none
     )
 
@@ -45,9 +45,13 @@ type Model
 
 
 type alias MenuState =
-    { players : List PlayerCreation
-    , idCount : Int
-    }
+    List String
+
+
+
+-- { players : List PlayerCreation
+-- , idCount : Int
+-- }
 
 
 type alias PlayerCreation =
@@ -123,10 +127,10 @@ type alias Player =
     }
 
 
-newPlayer : ( String, Int ) -> Player
-newPlayer ( name, id ) =
+newPlayer : Int -> String -> Player
+newPlayer index name =
     { name = name
-    , id = id
+    , id = index
     , ones = Nothing
     , twos = Nothing
     , threes = Nothing
@@ -159,7 +163,7 @@ type Msg
 type MenuSubMsg
     = MenuNoOp
     | UpdatePlayerName Int String
-    | AddPlayer Int
+    | RemovePlayer Int
     | MorePlayers
     | StartGame
 
@@ -208,36 +212,32 @@ unwrapGameMsg msg =
 
 
 updateMenu : MenuSubMsg -> MenuState -> ( Model, Cmd Msg )
-updateMenu msg menuState =
+updateMenu msg players =
     case msg of
         MenuNoOp ->
-            ( Menu menuState, Cmd.none )
+            ( Menu players, Cmd.none )
 
-        UpdatePlayerName id text ->
-            ( Menu { menuState | players = updatePlayerName id text menuState.players }, Cmd.none )
+        UpdatePlayerName index name ->
+            ( players
+                |> List.setAt index name
+                |> Menu
+            , Cmd.none
+            )
 
-        AddPlayer id ->
-            let
-                addPlayer player =
-                    if player.id == id then
-                        { player | isAdded = True }
-
-                    else
-                        player
-            in
-            ( Menu { menuState | players = List.map addPlayer menuState.players }, Cmd.none )
+        RemovePlayer index ->
+            ( players
+                |> List.removeAt index
+                |> Menu
+            , Cmd.none
+            )
 
         MorePlayers ->
-            ( Menu
-                { menuState
-                    | players = List.append menuState.players [ createNewPlayer menuState.idCount ]
-                    , idCount = menuState.idCount + 1
-                }
+            ( Menu <| players ++ [ "" ]
             , Cmd.none
             )
 
         StartGame ->
-            ( startGame menuState.players, Cmd.none )
+            ( startGame players, Cmd.none )
 
 
 updatePlayerName : Int -> String -> List PlayerCreation -> List PlayerCreation
@@ -258,32 +258,21 @@ updateName id text player =
         player
 
 
-startGame : List PlayerCreation -> Model
+startGame : List String -> Model
 startGame players =
-    List.filter (\player -> player.isAdded) players
-        |> List.map (\{ name, id } -> ( name, id ))
-        |> newGame
-
-
-newGame : List ( String, Int ) -> Model
-newGame playerData =
-    let
-        ( _, ids ) =
-            List.unzip playerData
-    in
-    case ids of
+    case players of
         [] ->
-            Error "New Game: Cannot find any players."
+            Error "New Game: Need at least one player…"
 
         first :: rest ->
             Game
                 { dice = List.repeat 5 (Die Blank False)
-                , players = List.map newPlayer playerData
+                , players = List.indexedMap newPlayer players
                 , activePlayer = 0
-                , firstPlayerId = first
-                , restPlayerIds = rest
-                , activePlayerId = first
-                , waitingPlayerIds = rest
+                , firstPlayerId = 0
+                , restPlayerIds = List.range 1 (List.length rest)
+                , activePlayerId = 0
+                , waitingPlayerIds = List.range 1 (List.length rest)
                 , rollsLeft = 3
                 , newRound = True
                 }
@@ -444,7 +433,7 @@ canHasPlayer : Maybe Player -> Player
 canHasPlayer maybePlayer =
     case maybePlayer of
         Nothing ->
-            newPlayer ( "unknown", 1234 )
+            newPlayer 1234 "unknown"
 
         Just player ->
             player
@@ -504,8 +493,8 @@ subscriptions model =
 view : Model -> Html Msg
 view model =
     case model of
-        Menu menuState ->
-            viewMenu menuState
+        Menu players ->
+            viewMenu players
 
         Game gameState ->
             viewGame gameState
@@ -517,41 +506,32 @@ view model =
                 ]
 
 
-viewMenu : MenuState -> Html Msg
-viewMenu menuState =
+viewMenu : List String -> Html Msg
+viewMenu players =
     div []
         ([ h1 [] [ text "Yahtzee!" ] ]
-            ++ playerFields menuState
-            ++ [ div [] [ button [ onClick (MenuMsg MorePlayers) ] [ text "More players" ], span [] [ text "Sometext" ] ]
+            ++ List.indexedMap viewPlayerField players
+            ++ [ div [] [ button [ onClick (MenuMsg MorePlayers) ] [ text "Add another player" ] ]
                , div [] [ button [ onClick (MenuMsg StartGame) ] [ text "Start game" ] ]
                ]
         )
 
 
-playerFields : MenuState -> List (Html Msg)
-playerFields menuState =
-    List.map updateNewPlayer menuState.players
-
-
-updateNewPlayer : PlayerCreation -> Html Msg
-updateNewPlayer player =
-    if player.isAdded then
-        div [] [ text player.name ]
-
-    else
-        div []
-            [ input
-                [ A.type_ "text"
-                , A.placeholder "Player name"
-                , A.autofocus True
-                , onInput (\text -> MenuMsg (UpdatePlayerName player.id text))
-                ]
-                []
-            , button
-                [ onClick (MenuMsg (AddPlayer player.id))
-                ]
-                [ text "Add player" ]
+viewPlayerField : Int -> String -> Html Msg
+viewPlayerField index player =
+    div []
+        [ input
+            [ A.type_ "text"
+            , A.placeholder "Player name"
+            , A.autofocus True
+            , onInput (\text -> MenuMsg (UpdatePlayerName index text))
             ]
+            []
+        , button
+            [ onClick (MenuMsg (RemovePlayer index))
+            ]
+            [ text "Remove" ]
+        ]
 
 
 
@@ -583,7 +563,7 @@ viewGame gameState =
             log "Active player" (Debug.toString gameState.activePlayerId)
 
         activePlayer =
-            Maybe.withDefault (newPlayer ( "unknown", 1234 ))
+            Maybe.withDefault (newPlayer 1234 "unknown")
                 (List.getAt gameState.activePlayer gameState.players)
     in
     div []
