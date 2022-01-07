@@ -13,7 +13,7 @@ import List.Extra as List
 import Random
 import Random.Extra as Random
 import String
-import Svg exposing (Svg, svg)
+import Svg exposing (Svg, g, svg)
 import Svg.Attributes as SvgA
 
 
@@ -41,6 +41,7 @@ init _ =
 type Model
     = Menu MenuState
     | Game GameState
+    | Error String
 
 
 type alias MenuState =
@@ -50,13 +51,17 @@ type alias MenuState =
 
 
 type alias PlayerCreation =
-    { name : String, playerId : Int, isAdded : Bool }
+    { name : String, id : Int, isAdded : Bool }
 
 
 type alias GameState =
     { dice : List Die
     , players : List Player
     , activePlayer : Int
+    , firstPlayerId : Int
+    , restPlayerIds : List Int
+    , activePlayerId : Int
+    , waitingPlayerIds : List Int
     , rollsLeft : Int
     , newRound : Bool
     }
@@ -107,6 +112,7 @@ type Category
 
 type alias Player =
     { name : String
+    , id : Int
     , ones : Maybe Int
     , twos : Maybe Int
     , threes : Maybe Int
@@ -117,9 +123,10 @@ type alias Player =
     }
 
 
-newPlayer : String -> Player
-newPlayer playerName =
-    { name = playerName
+newPlayer : ( String, Int ) -> Player
+newPlayer ( name, id ) =
+    { name = name
+    , id = id
     , ones = Nothing
     , twos = Nothing
     , threes = Nothing
@@ -133,6 +140,7 @@ newPlayer playerName =
 testPlayer : String -> Int -> Int -> Player
 testPlayer playerName oneTest sumTest =
     { name = playerName
+    , id = 1234
     , ones = Just oneTest
     , twos = Nothing
     , threes = Nothing
@@ -175,6 +183,9 @@ update msg model =
         Game gameState ->
             updateGame (Maybe.withDefault NoOp (unwrapGameMsg msg)) gameState
 
+        Error errorMsg ->
+            ( Error errorMsg, Cmd.none )
+
 
 unwrapMenuMsg : Msg -> Maybe MenuSubMsg
 unwrapMenuMsg msg =
@@ -208,7 +219,7 @@ updateMenu msg menuState =
         AddPlayer id ->
             let
                 addPlayer player =
-                    if player.playerId == id then
+                    if player.id == id then
                         { player | isAdded = True }
 
                     else
@@ -236,7 +247,7 @@ updatePlayerName id text players =
 
 updateName : Int -> String -> PlayerCreation -> PlayerCreation
 updateName id text player =
-    if player.playerId == id then
+    if player.id == id then
         let
             log1 =
                 log "input" player.name
@@ -250,19 +261,32 @@ updateName id text player =
 startGame : List PlayerCreation -> Model
 startGame players =
     List.filter (\player -> player.isAdded) players
-        |> List.map .name
+        |> List.map (\{ name, id } -> ( name, id ))
         |> newGame
 
 
-newGame : List String -> Model
-newGame players =
-    Game
-        { dice = List.repeat 5 (Die Blank False)
-        , players = List.map newPlayer players
-        , activePlayer = 0
-        , rollsLeft = 3
-        , newRound = True
-        }
+newGame : List ( String, Int ) -> Model
+newGame playerData =
+    let
+        ( _, ids ) =
+            List.unzip playerData
+    in
+    case ids of
+        [] ->
+            Error "New Game: Cannot find any players."
+
+        first :: rest ->
+            Game
+                { dice = List.repeat 5 (Die Blank False)
+                , players = List.map newPlayer playerData
+                , activePlayer = 0
+                , firstPlayerId = first
+                , restPlayerIds = rest
+                , activePlayerId = first
+                , waitingPlayerIds = rest
+                , rollsLeft = 3
+                , newRound = True
+                }
 
 
 updateGame : GameSubMsg -> GameState -> ( Model, Cmd Msg )
@@ -307,6 +331,8 @@ updateGame msg gameState =
                     | dice = List.repeat 5 (Die Blank False)
                     , players = scorePlayer gameState category
                     , activePlayer = nextPlayer gameState.activePlayer (List.length gameState.players)
+                    , activePlayerId = Maybe.withDefault gameState.firstPlayerId (List.head gameState.waitingPlayerIds)
+                    , waitingPlayerIds = Maybe.withDefault gameState.restPlayerIds (List.tail gameState.waitingPlayerIds)
                     , rollsLeft = 3
                     , newRound = True
                 }
@@ -328,6 +354,13 @@ scorePlayer game category =
     let
         player =
             canHasPlayer (List.getAt game.activePlayer game.players)
+
+        scoreCategory score playa =
+            if playa.id == game.activePlayerId then
+                { player | ones = Just score, sum = playa.sum + score }
+
+            else
+                playa
     in
     case category of
         Ones ->
@@ -335,8 +368,9 @@ scorePlayer game category =
                 score =
                     scoreNumber game.dice One
             in
-            List.setAt game.activePlayer { player | ones = Just score, sum = player.sum + score } game.players
+            List.map (scoreCategory score) game.players
 
+        -- List.setAt game.activePlayer { player | ones = Just score, sum = player.sum + score } game.players
         Twos ->
             let
                 score =
@@ -410,7 +444,7 @@ canHasPlayer : Maybe Player -> Player
 canHasPlayer maybePlayer =
     case maybePlayer of
         Nothing ->
-            newPlayer "unknown"
+            newPlayer ( "unknown", 1234 )
 
         Just player ->
             player
@@ -476,6 +510,12 @@ view model =
         Game gameState ->
             viewGame gameState
 
+        Error errorMsg ->
+            div []
+                [ h1 [] [ text "Error:" ]
+                , h2 [] [ text errorMsg ]
+                ]
+
 
 viewMenu : MenuState -> Html Msg
 viewMenu menuState =
@@ -504,11 +544,11 @@ updateNewPlayer player =
                 [ A.type_ "text"
                 , A.placeholder "Player name"
                 , A.autofocus True
-                , onInput (\text -> MenuMsg (UpdatePlayerName player.playerId text))
+                , onInput (\text -> MenuMsg (UpdatePlayerName player.id text))
                 ]
                 []
             , button
-                [ onClick (MenuMsg (AddPlayer player.playerId))
+                [ onClick (MenuMsg (AddPlayer player.id))
                 ]
                 [ text "Add player" ]
             ]
@@ -536,8 +576,14 @@ updateNewPlayer player =
 viewGame : GameState -> Html Msg
 viewGame gameState =
     let
+        logPlayers =
+            log "Players" (Debug.toString (gameState.firstPlayerId :: gameState.restPlayerIds))
+
+        logActive =
+            log "Active player" (Debug.toString gameState.activePlayerId)
+
         activePlayer =
-            Maybe.withDefault (newPlayer "unknown")
+            Maybe.withDefault (newPlayer ( "unknown", 1234 ))
                 (List.getAt gameState.activePlayer gameState.players)
     in
     div []
